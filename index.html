@@ -113,6 +113,45 @@ html,body{height:100%;overflow:hidden;background:#0b1428;color:#fff;
   line-height:34px;color:var(--ink);white-space:pre-wrap;word-break:keep-all;overflow-wrap:break-word;min-height:34px}
 #message .c{opacity:0;color:#c08a3a;transition:opacity .35s ease,color 1.6s ease}
 #message .c.on{opacity:1;color:var(--ink)}
+/* fold the letter away to see the scene */
+.fold-btn{position:absolute;z-index:3;right:-8px;bottom:-16px;pointer-events:auto;cursor:pointer;
+  display:flex;align-items:center;gap:6px;height:34px;padding:0 14px 0 11px;border-radius:999px;
+  border:1px solid rgba(255,255,255,.25);background:var(--glass);color:#f6ead2;font-family:inherit;font-size:15px;font-weight:600;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 6px 16px rgba(0,0,0,.35);transform:rotate(1.4deg);transition:transform .2s}
+.fold-btn:hover{transform:rotate(1.4deg) translateY(-2px)}
+.fold-btn svg{width:16px;height:16px}
+.crease{position:absolute;inset:0;z-index:1;pointer-events:none;border-radius:5px;opacity:0;
+  background:linear-gradient(transparent 32.6%,rgba(90,60,40,.32) 33.2%,rgba(255,255,255,.55) 33.7%,transparent 34.6%,
+    transparent 65.6%,rgba(90,60,40,.32) 66.2%,rgba(255,255,255,.55) 66.7%,transparent 67.6%)}
+.paper-wrap.folded{animation:letterFold .9s cubic-bezier(.5,0,.35,1) forwards}
+.paper-wrap.unfolding{animation:letterUnfold .9s cubic-bezier(.5,0,.35,1) forwards}
+.paper-wrap.folded .crease{animation:crease .9s forwards}
+.paper-wrap.unfolding .crease{animation:crease .9s reverse forwards}
+.paper-wrap.folded .paper,.paper-wrap.folded .fold-btn,.paper-wrap.unfolding .fold-btn{pointer-events:none}
+@keyframes letterFold{
+  0%{transform:rotate(-1.4deg);opacity:1}
+  40%{transform:rotate(-1.4deg) scaleY(.34);opacity:1}
+  55%{transform:rotate(-1deg) scale(.82,.3);opacity:1}
+  100%{transform:translate(var(--fx,0),var(--fy,0)) rotate(9deg) scale(.13,.06);opacity:0}}
+@keyframes letterUnfold{
+  0%{transform:translate(var(--fx,0),var(--fy,0)) rotate(9deg) scale(.13,.06);opacity:0}
+  45%{transform:rotate(-1deg) scale(.82,.3);opacity:1}
+  60%{transform:rotate(-1.4deg) scaleY(.34);opacity:1}
+  100%{transform:rotate(-1.4deg);opacity:1}}
+@keyframes crease{0%{opacity:0}30%,100%{opacity:1}}
+#letter-note{position:fixed;z-index:30;right:max(18px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));
+  display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:4px;
+  font-family:'Caveat','Nanum Pen Script',cursive;font-size:19px;color:#f6ead2;text-shadow:0 1px 6px #000;
+  opacity:0;visibility:hidden;transform:scale(.5) rotate(-8deg);transition:opacity .4s,transform .5s cubic-bezier(.3,1.6,.5,1),visibility 0s .5s}
+#letter-note.show{opacity:1;visibility:visible;transform:none;transition:opacity .4s .55s,transform .6s cubic-bezier(.3,1.6,.5,1) .55s,visibility 0s .55s}
+#letter-note.show .ln-paper{animation:float 4s ease-in-out 1.2s infinite}
+#letter-note:focus-visible{outline:2px dashed var(--gold);outline-offset:4px;border-radius:8px}
+.ln-paper{position:relative;width:70px;height:46px;border-radius:3px;transform:rotate(6deg);
+  background:linear-gradient(transparent 32%,rgba(90,60,40,.25) 33%,transparent 35%,transparent 65%,rgba(90,60,40,.25) 66%,transparent 68%),var(--cream);
+  box-shadow:0 8px 18px rgba(0,0,0,.5)}
+.ln-paper::after{content:"";position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);border-radius:50%;
+  background:radial-gradient(circle at 34% 30%,#e0535d,#a01d2a 55%,#6e0f19);box-shadow:0 2px 4px rgba(0,0,0,.4)}
+@media (max-width:640px){#letter-note{bottom:max(8px,env(safe-area-inset-bottom));font-size:16px;gap:2px}.ln-paper{width:56px;height:38px}}
 #message .pen{display:inline-block;width:2px;height:1em;background:#8a5a33;vertical-align:-3px;margin-left:1px;
   animation:blink 1s steps(2) infinite}
 @keyframes blink{50%{opacity:0}}
@@ -175,7 +214,8 @@ html,body{height:100%;overflow:hidden;background:#0b1428;color:#fff;
 .btn.primary:hover{background:linear-gradient(180deg,#d23d4a,#a8232f)}
 .note{font-size:13.5px;color:#9fa8c0;margin-top:14px;line-height:1.45;text-align:center}
 .note b{color:#f3cf86;font-weight:600}
-@media (prefers-reduced-motion:reduce){.envelope{animation:none}}
+@media (prefers-reduced-motion:reduce){.envelope{animation:none}
+  .paper-wrap.folded,.paper-wrap.unfolding,.paper-wrap .crease{animation-duration:.01s!important}}
 </style>
 </head>
 <body>
@@ -211,6 +251,9 @@ html,body{height:100%;overflow:hidden;background:#0b1428;color:#fff;
       <circle cx="34" cy="42" r="2" fill="#fff" opacity=".6"/><circle cx="39" cy="34" r="2" fill="#fff" opacity=".6"/>
     </svg>
     <div class="paper" id="paper"><div id="message" lang="ko"></div></div>
+    <div class="crease" aria-hidden="true"></div>
+    <button class="fold-btn" id="btn-fold" title="Fold the letter to see the whole scene">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h16M4 15h16"/><path d="m9 19 3 3 3-3M9 5l3-3 3 3"/></svg>fold</button>
   </div>
 </main>
 
@@ -239,6 +282,7 @@ html,body{height:100%;overflow:hidden;background:#0b1428;color:#fff;
   <button class="btn-round hidden" id="btn-edit" aria-label="Back to editing" title="Back to editing">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></button>
 </div>
+<button id="letter-note" aria-label="Unfold the letter" title="Unfold the letter"><span class="ln-paper"></span>your letter ♡</button>
 <div id="hint"></div>
 <div id="toast" role="status"></div>
 
@@ -445,6 +489,15 @@ const Sound = (() => {
       if (!ok()) return; const t = ac.currentTime; const o = osc('sine', 500, t, t + .9, .09, .03, sfx);
       o.frequency.exponentialRampToValueAtTime(1300, t + .35); o.frequency.exponentialRampToValueAtTime(700, t + .85);
     },
+    flump(v = 1) { if (!ok()) return; const t = ac.currentTime; noiseHit(t, .38, .26 * v, 'lowpass', 520, sfx, .55); noiseHit(t + .04, .3, .07 * v, 'bandpass', 2200, sfx, .8); },
+    sleigh() {
+      if (!ok()) return; const t = ac.currentTime, notes = ['E7', 'G6', 'C7', 'A6'];
+      for (let i = 0; i < 26; i++) {
+        const tt = t + i * .11 + Math.random() * .03, fade = Math.sin(Math.PI * i / 26);
+        noiseHit(tt, .09, .06 * fade + .01, 'highpass', 7000, sfx, .9 + Math.random() * .3);
+        if (i % 2 === 0) bell(N(notes[(i / 2) % 4 | 0]), tt, .7, .035 * fade + .005);
+      }
+    },
     swish() { if (!ok()) return; const t = ac.currentTime; const f = noiseHit(t, .5, .09, 'bandpass', 900); f.frequency.exponentialRampToValueAtTime(4000, t + .45); bell(N('E6'), t + .2, 1.5, .06); },
     magic() { if (!ok()) return; const t = ac.currentTime; ['C6', 'E6', 'G6', 'B6', 'D7', 'G7'].forEach((n, i) => bell(N(n), t + i * .08, 2.6, .07)); },
     whoosh() {
@@ -470,6 +523,10 @@ const Scene = (() => {
   let pattern = 0, treeBoost = 0, cabinFlash = 0, holdTimer = null, drag = null;
   let aurora = 0, auroraOn = false, acc = 0, groundPile = null, paperPile = null, paperKey = null, surf = null;
   let snowHop = 0, sledBoost = 0, walkerH = 40;
+  // snow that builds up on things (0..1) and can be shaken off
+  let hatAcc = 0, tSnow = [0, 0, 0, 0], treeShake = 0, treeTalk = 20, treeWarned = false, bgPines = [], clumps = [];
+  // a sleigh across the moon, and the presents it drops
+  let sleigh = null, nextSleigh = 75 + Math.random() * 30, dropGift = null, extraGifts = [];
   const LIGHTS = ['255,80,80', '255,200,80', '90,195,255', '120,240,140', '255,130,215'];
   const sprites = {};
   const OFF = () => ({ oF: px * 10, oM: px * 22, oN: px * 38, vF: py * 4, vM: py * 8, vN: py * 12 });
@@ -533,6 +590,7 @@ const Scene = (() => {
     sprites.puff = glow('205,212,232', 64, .5);
     sprites.lights = LIGHTS.map(c => glow(c, 64, .25));
     sprites.white = glow('255,232,180', 64, .25);
+    sprites.red = glow('255,70,60', 64, .25);
     sprites.aur = ['90,255,170', '80,200,255', '200,120,255'].map(strip);
 
     hill = { x: W * (narrow ? .68 : .655), w: W * (narrow ? .045 : .05), h: H * .062 };
@@ -594,7 +652,9 @@ const Scene = (() => {
       if (Math.abs(x - ccx) < cw * .85 || Math.abs(x - hill.x) < hill.w * 2.8 || Math.abs(x - pond.x) < pond.rx * 1.05) continue;
       pines.push([x, S * (.07 + R() * .09)]);
     }
-    pines.sort((a, b) => a[1] - b[1]).forEach(([x, h]) => pine(g, x + M, gMid(x) + S * .01, h, R() < .5 ? '#163d33' : '#1b4636', 'rgba(244,248,255,.92)'));
+    const oldPines = bgPines;
+    bgPines = pines.sort((a, b) => a[1] - b[1]).map(([x, h], i) => ({ x, h, by: gMid(x) + S * .01, col: R() < .5 ? '#163d33' : '#1b4636',
+      s: oldPines[i] ? oldPines[i].s : .25 + R() * .3, shake: 0 }));
     cabin = drawCabin(g, ccx, gMid(ccx) + S * .006, cw, chh);
 
     /* near: big tree, bank, gifts */
@@ -676,9 +736,10 @@ const Scene = (() => {
     const X = cx + M, tw = th * .64, top = by - th;
     g.fillStyle = '#3b2416'; g.fillRect(X - tw * .06, by - th * .13, tw * .12, th * .14);
     const tiers = [[0, .3, .27], [.17, .5, .37], [.35, .7, .45], [.53, .9, .52]];
-    const lights = [], baubles = [];
+    const lights = [], baubles = [], tierGeo = [];
     tiers.forEach(([a, b, hwr], i) => {
       const ay = top + th * a, byy = top + th * b, hw = tw * hwr;
+      tierGeo.push({ ay, by: byy, hw, sc: 4 + i });
       const gr = g.createLinearGradient(X - hw, 0, X + hw, 0);
       gr.addColorStop(0, '#0e3a25'); gr.addColorStop(.45, '#1f6a43'); gr.addColorStop(1, '#0b2c1c');
       g.fillStyle = gr; g.beginPath(); g.moveTo(X, ay); g.lineTo(X + hw, byy);
@@ -707,7 +768,7 @@ const Scene = (() => {
       gr.addColorStop(0, '#fff'); gr.addColorStop(.25, cols[i % 4]); gr.addColorStop(1, 'rgba(0,0,0,.6)');
       g.fillStyle = gr; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
     });
-    return { x: cx, top, h: th, w: tw, lights, star: { x: cx, y: top - S * .004 }, box: { x0: cx - tw * .55, y0: top - S * .05, x1: cx + tw * .55, y1: by } };
+    return { x: cx, top, h: th, w: tw, lights, tiers: tierGeo, base: by, star: { x: cx, y: top - S * .004 }, box: { x0: cx - tw * .55, y0: top - S * .05, x1: cx + tw * .55, y1: by } };
   }
 
   function gift(g, x, by, w, h, col, rib) {
@@ -811,7 +872,7 @@ const Scene = (() => {
   /* -------- surface the front snow settles on: the letter, or the composer panel -------- */
   function getSurface() {
     const comp = document.querySelector('#composer:not(.hidden) .composer-card');
-    const pw = document.querySelector('#card:not(.hidden) #paper-wrap.show');
+    const pw = document.querySelector('#card:not(.hidden) #paper-wrap.show:not(.folded):not(.unfolding)');
     const el = comp || pw; if (!el) return null;
     const th = comp ? 0 : -1.4 * Math.PI / 180, r = el.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
     const cx = r.left + r.width / 2, cy = r.top + r.height / 2, tan = Math.tan(th);
@@ -831,7 +892,11 @@ const Scene = (() => {
     treeBoost = Math.max(0, treeBoost - .02 * dt); cabinFlash = Math.max(0, cabinFlash - .012 * dt);
     snowHop = Math.max(0, snowHop - .03 * dt); sledBoost = Math.max(0, sledBoost - dt / 60);
     aurora += ((auroraOn ? 1 : 0) - aurora) * .02 * dt;
-    acc = Math.min(1, acc + dt * (.00011 + storm * .0012));
+    const grow = dt * (.00011 + storm * .0012);
+    acc = Math.min(1, acc + grow); hatAcc = Math.min(1, hatAcc + grow);
+    for (let i = 0; i < 4; i++) tSnow[i] = Math.min(1, tSnow[i] + grow * (1.25 - i * .08));
+    for (const p of bgPines) { p.s = Math.min(1, p.s + grow * .9); p.shake = Math.max(0, p.shake - .025 * dt); }
+    treeShake = Math.max(0, treeShake - .025 * dt);
     const { oF, oM, oN, vF, vM, vN } = OFF();
 
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
@@ -870,8 +935,10 @@ const Scene = (() => {
       if (shoot.life <= 0) shoot = null;
     }
 
+    updateSleigh(dt);
     ctx.drawImage(L.far.c, -M - oF, -vF, L.far.w, L.far.h);
     ctx.drawImage(L.mid.c, -M - oM, -vM, L.mid.w, L.mid.h);
+    drawPines(oM, vM);
 
     drawCabinLive(dt, oM, vM);
     updateWalker(dt);
@@ -892,6 +959,7 @@ const Scene = (() => {
     updateSkaters(dt); drawPond(oM, vM);
 
     ctx.drawImage(L.near.c, -M - oN, -vN, L.near.w, L.near.h);
+    drawGifts(dt, oN, vN);
 
     // footprints (slowly filled in by new snow)
     for (let i = prints.length - 1; i >= 0; i--) {
@@ -904,17 +972,18 @@ const Scene = (() => {
 
     // snowman (alive)
     const hop = snowHop > 0 ? -Math.sin((1 - snowHop) * Math.PI) * S * .025 : 0;
-    snowmanAt.box = snowman(ctx, snowmanAt.x - oN, snowmanAt.by - vN + hop, snowmanAt.s, acc);
+    snowmanAt.box = snowman(ctx, snowmanAt.x - oN, snowmanAt.by - vN + hop, snowmanAt.s, hatAcc);
 
-    // tree lights + star
+    // tree snow, lights + star
+    const tsnow = drawTreeSnow(dt, oN, vN), wob = treeShake > 0 ? Math.sin(T * 50) * treeShake * S * .004 : 0;
     const lr = S * .026, br = Math.max(1.6, S * .0042);
     tree.lights.forEach((l, i) => {
       let b;
       if (pattern === 0) b = .35 + .65 * Math.max(0, Math.sin(T * 2.4 + l.twk));
       else if (pattern === 1) b = .2 + .8 * Math.pow(Math.max(0, Math.sin(T * 4.5 - i * .42)), 3);
       else b = .55 + .45 * Math.sin(T * 1.6);
-      b = Math.min(1, b + treeBoost * .8);
-      const x = l.x - oN, y = l.y - vN, spr = pattern === 2 ? sprites.white : sprites.lights[l.c];
+      b = Math.min(1, b + treeBoost * .8) * (1 - tsnow * .55);
+      const x = l.x - oN + wob, y = l.y - vN, spr = pattern === 2 ? sprites.white : sprites.lights[l.c];
       ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = b * .85; ctx.drawImage(spr, x - lr, y - lr, lr * 2, lr * 2);
       ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = .55 + .45 * b;
       ctx.fillStyle = pattern === 2 ? 'rgb(255,240,200)' : `rgb(${LIGHTS[l.c]})`;
@@ -931,6 +1000,15 @@ const Scene = (() => {
     for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? sr * .42 : sr; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
     ctx.closePath(); const sg = ctx.createRadialGradient(0, -sr * .2, 0, 0, 0, sr); sg.addColorStop(0, '#fff8de'); sg.addColorStop(1, '#f0b93a');
     ctx.fillStyle = sg; ctx.fill(); ctx.restore();
+
+    // clumps of snow shaken off trees and roofs
+    for (let i = clumps.length - 1; i >= 0; i--) {
+      const c = clumps[i]; c.vy += .22 * dt; c.x += c.vx * dt; c.y += c.vy * dt;
+      if (c.y >= c.land) { puff(c.x, c.land, 3, .7); clumps.splice(i, 1); continue; }
+      ctx.globalAlpha = .95; ctx.drawImage(sprites.flake, c.x - c.r * 2.2, c.y - c.r * 2.2, c.r * 4.4, c.r * 4.4);
+      ctx.fillStyle = '#f8fbff'; ctx.beginPath(); ctx.arc(c.x, c.y, c.r, 0, 7); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
 
     // snow dust (sled spray, footsteps, brushing)
     for (let i = dust.length - 1; i >= 0; i--) {
@@ -1057,6 +1135,143 @@ const Scene = (() => {
     }
   }
 
+  /* ---------------- snow that builds up, and shaking it off ---------------- */
+  function pineSnow(g, x, by, h, s) {
+    g.fillStyle = 'rgba(246,250,255,.96)';
+    const k = .3 + .65 * s, d = h * .04 * s;
+    for (let i = 0; i < 3; i++) {
+      const ty = by - h + i * h * .26, bh = h * .42, hw = h * (.19 + i * .075);
+      g.beginPath(); g.moveTo(x, ty - 1 - d);
+      g.lineTo(x + hw * k * 1.03, ty + bh * k);
+      g.quadraticCurveTo(x + hw * .25 * k, ty + bh * k * .78, x, ty + bh * k * 1.06);
+      g.quadraticCurveTo(x - hw * .3 * k, ty + bh * k * .78, x - hw * k * 1.06, ty + bh * k * .98);
+      g.closePath(); g.fill();
+    }
+  }
+  function drawPines(oM, vM) {
+    for (const p of bgPines) {
+      const x = p.x - oM, by = p.by - vM, h = p.h;
+      if (x < -h || x > W + h) continue;
+      const rot = p.shake > 0 ? Math.sin(T * 38 + p.x) * p.shake * .07 : 0;
+      if (rot) { ctx.save(); ctx.translate(x, by); ctx.rotate(rot); ctx.translate(-x, -by); }
+      pine(ctx, x, by, h, p.col, null);
+      if (p.s > .03) pineSnow(ctx, x, by, h, p.s);
+      if (rot) ctx.restore();
+    }
+  }
+  function shakeOff(x, y, w, land, n) {
+    for (let k = 0; k < n; k++) clumps.push({ x: x + (Math.random() - .5) * w, y: y + Math.random() * 6, vx: (Math.random() - .5) * 1.4 + wind * .3,
+      vy: -Math.random() * 1.6, r: S * (.0025 + Math.random() * .0045), land: land - Math.random() * S * .02 });
+  }
+  function drawTreeSnow(dt, oN, vN) {
+    let sum = 0; const wob = treeShake > 0 ? Math.sin(T * 50) * treeShake * S * .004 : 0;
+    tree.tiers.forEach((t, i) => {
+      const sn = tSnow[i]; sum += sn; if (sn < .03) return;
+      const X = tree.x - oN + wob, ay = t.ay - vN, by = t.by - vN, hw = t.hw, d = S * (.003 + .013 * sn), f0 = i === 0 ? .2 : .08;
+      ctx.fillStyle = '#f6faff';
+      [-1, 1].forEach(side => {   // a lumpy band of snow along both sloping edges of the tier
+        ctx.beginPath();
+        for (let k = 0; k <= 12; k++) {
+          const f = f0 + (1 - f0) * k / 12, bump = d * (.6 + .4 * Math.sin(f * 11 + i * 2 + side)) * Math.min(1, (1 - f) * 8 + .35);
+          ctx.lineTo(X + side * hw * f, ay + (by - ay) * f - bump);
+        }
+        for (let k = 12; k >= 0; k--) { const f = f0 + (1 - f0) * k / 12; ctx.lineTo(X + side * (hw * f - d * .3), ay + (by - ay) * f + d * .5); }
+        ctx.closePath(); ctx.fill();
+      });
+      const r = S * .005 * (.4 + sn);   // lumps on the branch tips
+      for (let k = 0; k <= t.sc; k++) { const x = X - hw + k / t.sc * hw * 2; ellipse(ctx, x * .98 + X * .02, by - r * .4, r * 1.6, r); ctx.fill(); }
+      if (sn >= 1 && Math.random() < .0015 * dt) {   // a fully loaded branch drops a clump on its own
+        tSnow[i] = .65; const side = Math.random() < .5 ? -1 : 1;
+        shakeOff(X + side * hw * .85, by, hw * .3, tree.base - vN, 4); Sound.flump(.35);
+      }
+    });
+    const avg = sum / 4;
+    treeTalk -= dt / 60;
+    if (avg > .55 && treeTalk <= 0) {   // the tree asks for help when it's getting buried
+      treeTalk = 35;
+      bubble(avg > .85 ? 'So heavy… shake me! ❄' : 'Brr, I’m getting snowy!', () => { const { oN, vN } = OFF(); return [tree.star.x - oN, tree.star.y - vN - S * .035]; }, 3);
+      if (!treeWarned) { treeWarned = true; toast('❄ Snow is piling up — tap the trees, roof or snowman to shake it off', 3800); }
+    }
+    return avg;
+  }
+
+  /* ---------------- a sleigh flies across the moon and drops a present ---------------- */
+  function launchSleigh() {
+    const sl = sleigh = { dir: Math.random() < .5 ? 1 : -1, f: 0, dur: 11, dropped: false, ph: 0, x: -999, y: 0 };
+    Sound.sleigh();
+    setTimeout(() => sleigh === sl && bubble('Ho ho ho! ✨', () => [sl.x, sl.y - S * .04], 3), 2200);
+  }
+  function reindeer(x, y, u, ph) {
+    ellipse(ctx, x, y, u * 2.6, u * 1.1); ctx.fill();
+    ctx.lineWidth = u * .9; ctx.beginPath(); ctx.moveTo(x + u * 2, y - u * .3); ctx.lineTo(x + u * 3.2, y - u * 2.2); ctx.stroke();
+    ellipse(ctx, x + u * 3.8, y - u * 2.5, u, u * .6); ctx.fill();
+    ctx.lineWidth = u * .3; ctx.beginPath();
+    ctx.moveTo(x + u * 3.2, y - u * 2.9); ctx.lineTo(x + u * 2.6, y - u * 4.7); ctx.moveTo(x + u * 2.9, y - u * 3.8); ctx.lineTo(x + u * 2, y - u * 4.3);
+    ctx.moveTo(x + u * 2.9, y - u * 3.8); ctx.lineTo(x + u * 3.6, y - u * 4.7); ctx.stroke();
+    const a = Math.sin(ph) * u * 1.4; ctx.lineWidth = u * .45; ctx.beginPath();
+    ctx.moveTo(x + u * 1.6, y + u * .6); ctx.lineTo(x + u * 2.6 + a, y + u * 2.6); ctx.moveTo(x + u * 1.1, y + u * .6); ctx.lineTo(x + u * 1.5 - a * .6, y + u * 2.6);
+    ctx.moveTo(x - u * 1.6, y + u * .6); ctx.lineTo(x - u * 2.7 - a, y + u * 2.4); ctx.moveTo(x - u * 1.1, y + u * .6); ctx.lineTo(x - u * 1.5 + a * .6, y + u * 2.6);
+    ctx.stroke();
+  }
+  function updateSleigh(dt) {
+    nextSleigh -= dt / 60;
+    if (!sleigh && nextSleigh <= 0 && !SHOT) launchSleigh();
+    if (!sleigh) return;
+    const s = sleigh; s.f += dt / 60 / s.dur; s.ph += .3 * dt;
+    if (s.f >= 1) { sleigh = null; nextSleigh = 100 + Math.random() * 80; return; }
+    const f = s.dir > 0 ? s.f : 1 - s.f, mf = (moon.x + W * .15) / (W * 1.3);
+    s.x = -W * .15 + f * W * 1.3 - px * 4; s.y = moon.y + moon.r * .3 + Math.pow(f - mf, 2) * H * .6 + Math.sin(s.ph * .25) * 3 - py * 3;
+    const u = S * .0055;
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .3;
+    ctx.drawImage(sprites.gold, s.x - u * 14 + s.dir * u * 8, s.y - u * 10, u * 28, u * 20);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    ctx.save(); ctx.translate(s.x, s.y); ctx.scale(s.dir, 1);
+    ctx.fillStyle = ctx.strokeStyle = '#120e24'; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.lineWidth = u * .6; ctx.beginPath(); ctx.moveTo(-u * 7, u * 2.3); ctx.lineTo(u * 3, u * 2.3); ctx.quadraticCurveTo(u * 5.2, u * 2.3, u * 4.6, u * .5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-u * 7.6, -u * 2.6); ctx.lineTo(-u * 6.6, u * 1.6); ctx.lineTo(u * 2.5, u * 1.6);
+    ctx.quadraticCurveTo(u * 4.1, u * 1.6, u * 3.7, -u * .4); ctx.lineTo(-u * 4, -u * .2); ctx.lineTo(-u * 5.6, -u * 2.9); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.arc(-u * 6.2, -u * 2.7, u * 1.8, 0, 7); ctx.fill();                       // sack
+    ctx.beginPath(); ctx.arc(-u * 3, -u * 1.7, u * 1.9, 0, 7); ctx.fill();                         // driver
+    ctx.beginPath(); ctx.arc(-u * 2.6, -u * 4.1, u * 1.1, 0, 7); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-u * 3.8, -u * 4.5); ctx.lineTo(-u * 1.5, -u * 4.7); ctx.lineTo(-u * 4.4, -u * 6.6); ctx.closePath(); ctx.fill();
+    ctx.lineWidth = u * .22; ctx.beginPath(); ctx.moveTo(-u * 1.6, -u * 2.2); ctx.lineTo(u * 25.5, -u * 2.6 + Math.sin(s.ph + 2) * u * .5); ctx.stroke();
+    for (let k = 0; k < 3; k++) reindeer(u * (9 + k * 7), -u * .4 + Math.sin(s.ph * .5 + k) * u * .5, u, s.ph + k * 1.3);
+    const nx = u * 27.8, ny = -u * 2.9 + Math.sin(s.ph * .5 + 2) * u * .5;
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .8 + .2 * Math.sin(T * 9);
+    ctx.drawImage(sprites.red, nx - u * 3, ny - u * 3, u * 6, u * 6);
+    ctx.restore(); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    if (Math.random() < .7 * dt) sparks.push({ x: s.x - s.dir * u * 8, y: s.y + u * 2, vx: -s.dir * Math.random(), vy: Math.random() * .6, life: .8, s: 3 + Math.random() * 5, spr: Math.random() < .5 ? sprites.gold : sprites.white });
+    if (!s.dropped && !dropGift && extraGifts.length < 4 && Math.abs(s.x - tree.x) < W * .04) {
+      s.dropped = true;
+      const off = [-.52, .5, -.74, .2][extraGifts.length], tx = tree.x + tree.w * off, gh = tree.h * .1 * (.7 + Math.random() * .3);
+      const pal = [['#7a3fb0', '#f1c75b'], ['#2f6fb0', '#f6ead2'], ['#c62a35', '#2c6e49'], ['#e3b13e', '#b3202b']][(Math.random() * 4) | 0];
+      dropGift = { x: s.x, y: s.y, tx, by: gNear(tx) + S * (off === .2 ? .026 : .012), w: gh * (1 + Math.random() * .3), h: gh, col: pal[0], rib: pal[1], sw: 0 };
+    }
+  }
+  function drawGifts(dt, oN, vN) {
+    if (dropGift) {
+      const g = dropGift; g.y += 1.1 * dt * S / 800; g.x += (g.tx - g.x) * .025 * dt; g.sw += .05 * dt;
+      const x = g.x - oN, y = Math.min(g.y, g.by) - vN, cy = y - g.h * 2.8;
+      ctx.save(); ctx.translate(x, y - g.h); ctx.rotate(Math.sin(g.sw) * .15); ctx.translate(-x, -(y - g.h));
+      ctx.strokeStyle = 'rgba(255,255,255,.75)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(x - g.w * 1.2, cy); ctx.lineTo(x - g.w * .4, y - g.h * 1.2); ctx.moveTo(x + g.w * 1.2, cy); ctx.lineTo(x + g.w * .4, y - g.h * 1.2); ctx.stroke();
+      ctx.fillStyle = '#c62a35'; ctx.beginPath(); ctx.arc(x, cy, g.w * 1.2, Math.PI, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#f6ead2'; ctx.beginPath(); ctx.moveTo(x, cy); ctx.arc(x, cy, g.w * 1.2, -Math.PI * .62, -Math.PI * .38); ctx.closePath(); ctx.fill();
+      gift(ctx, x, y, g.w, g.h, g.col, g.rib); ctx.restore();
+      if (g.y >= g.by) {
+        g.x = g.tx; extraGifts.push(g); dropGift = null; puff(x, y, 10); Sound.magic();
+        bubble('A present for you! 🎁', () => { const { oN, vN } = OFF(); return [g.x - oN, g.by - vN - g.h * 1.4]; }, 3);
+      }
+    }
+    for (const g of extraGifts) {
+      const x = g.x - oN, y = g.by - vN;
+      gift(ctx, x, y, g.w, g.h, g.col, g.rib);
+      ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .25 + .2 * Math.sin(T * 3 + g.tx);
+      ctx.drawImage(sprites.gold, x - g.w * 1.3, y - g.h * 1.9, g.w * 2.6, g.w * 2.6);
+      ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    }
+  }
+
   function updateWalker(dt) {
     const w = walker, d = cabin.door, doorX = d.x + d.w / 2, target = doorX + S * .15, sp = .5 * dt * S / 900;
     switch (w.st) {
@@ -1151,6 +1366,20 @@ const Scene = (() => {
   /* ---------------- interaction ---------------- */
   function tap(x, y) {
     const { oM, vM, oN, vN } = OFF();
+    // catch a shooting star → make a wish (and someone flies by)
+    if (shoot) for (let k = 0; k <= 14; k += 2) if (Math.hypot(x - (shoot.x - shoot.vx * k), y - (shoot.y - shoot.vy * k)) < 36) {
+      burst(x, y, 34, sprites.white); Sound.magic(); shoot = null;
+      toast('🌠 You caught a shooting star — make a wish!', 3200); if (!sleigh) nextSleigh = Math.min(nextSleigh, 1.6); return 'star';
+    }
+    // presents the sleigh dropped → open one
+    for (let i = extraGifts.length - 1; i >= 0; i--) {
+      const g = extraGifts[i], gx = g.x - oN, gy = g.by - vN;
+      if (Math.abs(x - gx) < g.w * .8 && y > gy - g.h * 1.5 && y < gy + 6) {
+        extraGifts.splice(i, 1); burst(gx, gy - g.h * .6, 40, 'mix'); puff(gx, gy, 8); Sound.magic();
+        const inside = ['a big warm hug 🤗', 'a year full of good luck 🍀', 'endless hot cocoa ☕', 'sweet dreams all winter 🌙', 'lots of laughter with friends 😊', 'a sky full of wishes come true ✨'];
+        toast('🎁 Inside: ' + inside[(Math.random() * inside.length) | 0], 3400); return 'gift';
+      }
+    }
     // moon → northern lights
     if (Math.hypot(x - (moon.x - px * 4), y - (moon.y - py * 3)) < moon.r * 1.9) {
       auroraOn = !auroraOn; Sound.magic(); burst(x, y, 26, sprites.white);
@@ -1159,6 +1388,7 @@ const Scene = (() => {
     // snowman
     if (inBox(snowmanAt.box, x, y, 0, 0)) {
       snowHop = 1; Sound.boop(); playTrack('wish', '☃');
+      if (hatAcc > .1) { const [hx, hy] = snowmanAt.box.head; shakeOff(hx, hy, S * .02, snowmanAt.by - vN, Math.round(hatAcc * 5)); hatAcc = 0; }
       const lines = ['Brrr! ☃', 'Hug me! ♡', 'Hello friend!', 'I love snow!'];
       bubble(lines[(Math.random() * lines.length) | 0], () => { const { oN, vN } = OFF(); return [snowmanAt.x - oN, snowmanAt.box.y0 + 4]; });
       puff(x, y, 8); return 'snowman';
@@ -1181,14 +1411,37 @@ const Scene = (() => {
       burst(x, y, 18, sprites.white); return 'pond';
     }
     if (inBox(tree.box, x, y, oN, vN)) {
+      treeShake = 1;
+      if (tSnow.reduce((a, b) => a + b, 0) > .25) {
+        tree.tiers.forEach((t, i) => {
+          [-1, 1].forEach(sd => shakeOff(tree.x - oN + sd * t.hw * .6, t.by - vN - 4, t.hw * .9, tree.base - vN, Math.round(tSnow[i] * 9)));
+          tSnow[i] = 0;
+        });
+        Sound.flump(1); treeTalk = 40;
+        bubble('Ahh, thank you! ✨', () => { const { oN, vN } = OFF(); return [tree.star.x - oN, tree.star.y - vN - S * .035]; }, 2.2);
+      }
       pattern = (pattern + 1) % 3; treeBoost = 1; Sound.treeChime(); playTrack('silent', '🎄');
       burst(tree.star.x - oN, tree.star.y - vN, 30, 'mix'); return 'tree';
     }
     if (inBox(cabin.box, x, y, oM, vM)) {
       cabinFlash = 1; Sound.cabin();
+      if (acc > .12) {
+        const r = cabin.roof, land = cabin.door.gy - vM;
+        [0, 2].forEach(e => { for (let k = 0; k < 6; k++) { const f = Math.random(); shakeOff(r[e][0] + (r[1][0] - r[e][0]) * f * .6 - oM, r[e][1] + (r[1][1] - r[e][1]) * f * .6 - vM, 8, land, 1); } shakeOff(r[e][0] - oM, r[e][1] - vM, 14, land, Math.round(acc * 8)); });
+        acc = 0; Sound.flump(.8);
+      }
       if (walker.st === 'in') walker.t = 0;
       for (let i = 0; i < 6; i++) smoke.push({ x: cabin.chimney.x + (Math.random() - .5) * 8, y: cabin.chimney.y - i * 6, r: S * .012, a: .45, vy: -.6 - Math.random() * .3 });
       burst(cabin.win.x + cabin.win.w / 2 - oM, cabin.win.y + cabin.win.h / 2 - vM, 14, sprites.warm); return 'cabin';
+    }
+    for (let i = bgPines.length - 1; i >= 0; i--) {
+      const p = bgPines[i], x0 = p.x - oM, b0 = p.by - vM;
+      if (Math.abs(x - x0) < Math.max(14, p.h * .28) && y > b0 - p.h * 1.05 && y < b0 - p.h * .1) {
+        p.shake = 1;
+        if (p.s > .06) { for (let k = 0; k < 3; k++) shakeOff(x0, b0 - p.h + k * p.h * .26 + p.h * .15, p.h * .25 * (1 + k * .5), b0, Math.round(p.s * 4)); Sound.flump(.5); }
+        else Sound.brush();
+        p.s = 0; return 'pine';
+      }
     }
     if (y + vM > gMid(x + oM) + 3) { // snowy ground → footprints
       addPrint(x + oM - 4, y + vM, 0, 1); addPrint(x + oM + 4, y + vM - 2, 0, -1); Sound.crunch(); puff(x, y, 4, .6); return 'ground';
@@ -1258,8 +1511,35 @@ function graphemes(s) {
   return [...s];
 }
 
+/* fold the letter away to reveal (and play with) the whole scene */
+const paperWrap = $('#paper-wrap'), letterNote = $('#letter-note');
+let folded = false, foldedOnce = false;
+function setFolded(on) {
+  if (on === folded || !paperWrap.classList.contains('show')) return;
+  folded = on;
+  const a = paperWrap.getBoundingClientRect(), b = letterNote.getBoundingClientRect();
+  if (on) {
+    paperWrap.style.setProperty('--fx', (b.left + b.width / 2 - (a.left + a.width / 2)) + 'px');
+    paperWrap.style.setProperty('--fy', (b.top + b.height / 2 - (a.top + a.height / 2)) + 'px');
+    paperWrap.classList.remove('unfolding'); paperWrap.classList.add('folded');
+    letterNote.classList.add('show'); Sound.brush();
+    if (hint.i === 0 && $('#hint').classList.contains('show')) hint(1);
+    if (!foldedOnce) { foldedOnce = true; setTimeout(() => folded && toast('✨ Tap anything in the scene!', 2600), 900); }
+  } else {
+    paperWrap.classList.remove('folded'); paperWrap.classList.add('unfolding');
+    letterNote.classList.remove('show'); Sound.swish();
+  }
+}
+function resetFold() { folded = false; paperWrap.classList.remove('folded', 'unfolding'); letterNote.classList.remove('show'); }
+paperWrap.addEventListener('animationend', e => { if (e.animationName === 'letterUnfold') paperWrap.classList.remove('unfolding'); });
+$('#btn-fold').onclick = () => setFolded(true);
+letterNote.onclick = () => setFolded(false);
+addEventListener('keydown', e => {
+  if (e.key === 'Escape' && !$('#card').classList.contains('hidden') && $('#composer').classList.contains('hidden')) setFolded(!folded);
+});
+
 function showEnvelope() {
-  opened = false; runToken++;
+  opened = false; runToken++; resetFold();
   $('#card').classList.add('hidden'); $('#hint').classList.remove('show');
   envelope.classList.remove('open'); envScreen.classList.remove('hidden', 'leaving');
 }
@@ -1282,7 +1562,7 @@ function showCard(msg, instant = false) {
     s.style.setProperty('--i', i); title.appendChild(s);
   });
   const sub = $('#subtitle'), pw = $('#paper-wrap'), box = $('#message');
-  sub.classList.remove('show'); pw.classList.remove('show'); box.innerHTML = ''; Scene.clearPaper();
+  resetFold(); sub.classList.remove('show'); pw.classList.remove('show'); box.innerHTML = ''; Scene.clearPaper();
   $('#card').classList.remove('hidden');
   $('#btn-replay').classList.remove('hidden');
 
@@ -1310,15 +1590,18 @@ function showCard(msg, instant = false) {
 }
 
 const HINTS = [
+  'fold the letter (bottom right of it) to see the whole snowy scene ✉',
   'tap the sledders, the skaters, the snowman or the tree — each one plays a different song 🎵',
   'tap the cabin to call someone outside · tap the moon for northern lights 🌌',
   'drag on the snow to leave footprints · press &amp; hold for a snowstorm ❄',
-  'snow settles on your letter — tap its top edge to brush it off'
+  'snow piles up on the trees, the roof and the snowman — tap them to shake it off ❄',
+  'snow settles on your letter too — tap its top edge to brush it off',
+  'catch a shooting star 🌠 … someone special might fly across the moon'
 ];
 function hint(i = 0) {
   const h = $('#hint'); clearTimeout(hint.t);
   if (i >= HINTS.length) { h.classList.remove('show'); return; }
-  h.innerHTML = HINTS[i]; h.classList.add('show');
+  hint.i = i; h.innerHTML = HINTS[i]; h.classList.add('show');
   hint.t = setTimeout(() => { h.classList.remove('show'); hint.t = setTimeout(() => hint(i + 1), 1300); }, 6500);
 }
 
@@ -1339,7 +1622,7 @@ function setupComposer() {
     message = text(); $('#composer').classList.add('hidden'); $('#btn-edit').classList.remove('hidden'); showEnvelope();
   };
   $('#btn-edit').onclick = () => {
-    runToken++; $('#card').classList.add('hidden'); envScreen.classList.add('hidden'); $('#hint').classList.remove('show');
+    runToken++; resetFold(); $('#card').classList.add('hidden'); envScreen.classList.add('hidden'); $('#hint').classList.remove('show');
     $('#btn-edit').classList.add('hidden'); $('#btn-replay').classList.add('hidden'); $('#composer').classList.remove('hidden');
   };
   $('#btn-link').onclick = async () => {
@@ -1381,7 +1664,7 @@ Scene.start();
 
 const fromLink = hashMsg();
 if (SHOT) {
-  $('#controls').classList.add('hidden');
+  $('#controls').classList.add('hidden'); $('#btn-fold').classList.add('hidden');
   if (params.get('shot') === 'card') { showCard(fromLink || DEFAULT_MSG, true); }
   else { showCard('', true); $('#paper-wrap').classList.add('hidden'); }
 } else if (fromLink) {
