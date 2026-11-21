@@ -213,15 +213,15 @@ html,body{height:100%;overflow:hidden;background:#0b1428;color:#fff;
   box-shadow:0 8px 22px rgba(160,30,40,.45)}
 .btn.primary:hover{background:linear-gradient(180deg,#d23d4a,#a8232f)}
 .pick-label{font-size:14px;color:#d6d9e6;margin:0 4px 6px;font-style:italic}
-.buddies{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:0 0 14px}
+.buddies{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin:0 0 14px}
 .buddy{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:6px 2px 5px;cursor:pointer;
   color:#efe2c8;font-family:inherit;font-size:13.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;line-height:1.15;transition:background .2s,border-color .2s}
-.buddy img{width:46px;height:46px;margin-bottom:2px;transition:transform .2s}
+.buddy img{width:44px;height:44px;margin-bottom:2px;transition:transform .2s}
 .buddy small{font-size:11.5px;font-weight:500;opacity:.65}
 .buddy:hover{background:rgba(255,255,255,.12)}.buddy:hover img{transform:translateY(-3px) rotate(-4deg)}
 .buddy[aria-checked=true]{border-color:var(--gold);background:rgba(243,207,134,.16);box-shadow:0 0 0 2px rgba(243,207,134,.3)}
 .buddy:focus-visible{outline:2px dashed var(--gold);outline-offset:2px}
-@media (max-width:440px){.buddies{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:440px){.buddies{grid-template-columns:repeat(4,1fr)}.buddy img{width:40px;height:40px}}
 .note{font-size:13.5px;color:#9fa8c0;margin-top:14px;line-height:1.45;text-align:center}
 .note b{color:#f3cf86;font-weight:600}
 @media (prefers-reduced-motion:reduce){.envelope{animation:none}
@@ -341,7 +341,7 @@ const cardLink = text => baseUrl() + '#m=' + enc(text) + (buddyKey !== 'hamster'
    ====================================================================== */
 const Sound = (() => {
   let ac = null, master, music, sfx, noise, timer = null, playing = false, muted = false;
-  let idx = 0, loopStart = 0, cur = 'silent';
+  let idx = 0, loopStart = 0, cur = 'silent', howlNodes = null;
   const NOTE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
   const midi = n => { const m = n.match(/^([A-G])(#|b)?(\d)$/); return 12 * (+m[3] + 1) + NOTE[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0); };
   const hz = m => 440 * Math.pow(2, (m - 69) / 12);
@@ -502,6 +502,23 @@ const Sound = (() => {
       if (!ok()) return; const t = ac.currentTime; const o = osc('sine', 500, t, t + .9, .09, .03, sfx);
       o.frequency.exponentialRampToValueAtTime(1300, t + .35); o.frequency.exponentialRampToValueAtTime(700, t + .85);
     },
+    howl(on) {   // the harsh storm's wind: noise through slowly wandering resonant filters
+      if (!ac) return; const t = ac.currentTime;
+      if (on && !howlNodes) {
+        const src = ac.createBufferSource(); src.buffer = noise; src.loop = true;
+        const g = ac.createGain(); g.gain.setValueAtTime(.0001, t); g.gain.exponentialRampToValueAtTime(1.1, t + 3);
+        const nodes = [src];
+        [[480, 7, .13, 240], [1150, 9, .21, 480]].forEach(([f, q, rate, depth]) => {
+          const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+          const lfo = ac.createOscillator(), lg = ac.createGain(); lfo.frequency.value = rate; lg.gain.value = depth;
+          lfo.connect(lg); lg.connect(bp.frequency); src.connect(bp); bp.connect(g); nodes.push(lfo);
+        });
+        g.connect(sfx); nodes.forEach(n => n.start(t)); howlNodes = { g, nodes };
+      } else if (!on && howlNodes) {
+        const h = howlNodes; howlNodes = null;
+        h.g.gain.cancelScheduledValues(t); h.g.gain.setTargetAtTime(.0001, t, 1.2); h.nodes.forEach(n => n.stop(t + 6));
+      }
+    },
     jingle() { if (!ok()) return; const t = ac.currentTime; bell(N('A6'), t, .8, .05); bell(N('E7'), t + .05, .6, .035); },
     squeak(v = 1) {
       if (!ok()) return; const t = ac.currentTime;
@@ -607,8 +624,12 @@ const BUDDIES = (() => {
     b.svg = svg(b, faces.open); b.thumb = url(b.svg); img[k] = {};
     if (typeof Image !== 'undefined') for (const f in faces) { img[k][f] = new Image(); img[k][f].src = url(svg(b, faces[f])); }
   }
-  const valid = k => Object.prototype.hasOwnProperty.call(LIST, k);
-  return { LIST, img, valid, get cur() { return LIST[buddyKey]; }, get faces() { return img[buddyKey]; } };
+  // "none": just the scene, no buddy
+  const NONE = { name: '', kind: 'None', hi: '', voice: 1,
+    thumb: url('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120"><circle cx="60" cy="64" r="44" fill="rgba(255,255,255,.06)" stroke="#cfd6e6" stroke-width="3" stroke-dasharray="7 7"/>' +
+      '<path d="M60 40v48M39 52l42 24M39 76l42-24" stroke="#e9eef8" stroke-width="4" stroke-linecap="round"/></svg>') };
+  const valid = k => k === 'none' || Object.prototype.hasOwnProperty.call(LIST, k);
+  return { LIST, NONE, img, valid, get on() { return buddyKey !== 'none'; }, get cur() { return LIST[buddyKey] || NONE; }, get faces() { return img[buddyKey]; } };
 })();
 
 /* ======================================================================
@@ -629,7 +650,9 @@ const Scene = (() => {
   let hatAcc = 0, tSnow = [0, 0, 0, 0], treeShake = 0, treeTalk = 20, treeWarned = false, bgPines = [], clumps = [];
   // a sleigh across the moon, and the presents it drops
   let mochi = { x: 0, y: 0, tx: 0, ty: 0, dir: 1, st: 'idle', t: 2, ph: 0, jy: 0, vy: 0, squash: 0, happy: 0, blinkT: 3, brr: false, box: null,
-    trail: [], gift: null, items: {}, cheeks: 0, opened: 0 };
+    trail: [], gift: null, items: {}, cheeks: 0, opened: 0, homeT: 90 + Math.random() * 40, inT: 0, sawStorm: false };
+  // the cabin door the buddy uses, and the harsh winter storm (blizzard) that can blow in while they're inside
+  let doorB = 0, bliz = 0, blizOn = false, blizT = 0, blizCool = 0, blizDir = 1;
   let sleigh = null, nextSleigh = 75 + Math.random() * 30, dropGift = null, extraGifts = [];
   const LIGHTS = ['255,80,80', '255,200,80', '90,195,255', '120,240,140', '255,130,215'];
   const sprites = {};
@@ -779,7 +802,7 @@ const Scene = (() => {
     snowmanAt.by = gNear(snowmanAt.x) + S * .01; snowmanAt.s = S * .9;
     if (!mochi.x) { mochi.x = W * .44; mochi.y = gNear(mochi.x) + S * .012; }
     else { mochi.x = clamp(mochi.x, W * .05, W * .95); mochi.y = clamp(mochi.y, H * .72, H - 4); }
-    mochi.trail = []; mochi.st = 'idle';
+    mochi.trail = []; if (mochi.st === 'follow') mochi.st = 'idle';   // a resize only drops the footprint trail
 
     /* characters */
     const ch = S * (narrow ? .072 : .05); walkerH = ch * 1.1;
@@ -918,6 +941,7 @@ const Scene = (() => {
   /* a little bundled-up person. y = feet. */
   function person(g, x, y, h, o) {
     const u = h / 10, sw = Math.sin(o.ph || 0);
+    if (o.shiver) x += Math.sin(T * 55 + (o.ph || 0)) * u * .35 * o.shiver;
     g.save(); g.translate(x, y); g.rotate(o.tilt || 0); g.scale((o.face || 1) * (o.sx == null ? 1 : o.sx), 1);
     g.lineCap = 'round'; g.lineJoin = 'round';
     let hip;
@@ -942,6 +966,7 @@ const Scene = (() => {
     if (o.wave != null) { const w = Math.sin(o.wave) * .7; g.moveTo(u * .5, sh); g.lineTo(u * (1.6 + w), sh - u * 2.6); g.moveTo(-u * .3, sh); g.lineTo(-u * .9, sh + u * 2.3); }
     else if (o.pull) { g.moveTo(0, sh); g.lineTo(-u * 2.4, sh + u * 1.4); }
     else if (o.sit) { g.moveTo(u * .3, sh); g.lineTo(u * 2.3, sh + u * 1.6); }
+    else if (o.hug) { g.moveTo(-u * .9, sh); g.lineTo(u * 1.3, sh + u * 1.3); g.moveTo(u * .9, sh); g.lineTo(-u * .5, sh + u * 1.5); }
     else if (o.arms) { g.moveTo(0, sh); g.lineTo(u * 2.7, sh - u * .2 + sw * u * .3); g.moveTo(0, sh); g.lineTo(-u * 2.7, sh - u * .5 - sw * u * .3); }
     else { g.moveTo(0, sh); g.lineTo(-sw * u * 1.3, sh + u * 2.3); g.moveTo(0, sh); g.lineTo(sw * u * 1.3, sh + u * 2.3); }
     g.stroke();
@@ -996,7 +1021,15 @@ const Scene = (() => {
     const dt = Math.min(50, now - last) / 16.667; last = now; T += dt / 60; frameN++;
     px += (tpx - px) * .04 * dt; py += (tpy - py) * .04 * dt;
     windT += (.25 + px * .9 - windT) * .01 * dt; wind += (windT - wind) * .03 * dt;
-    storm += ((stormOn ? 1 : 0) - storm) * .025 * dt;
+    if (blizOn) { blizT -= dt / 60; if (blizT <= 0) { blizOn = false; blizCool = 45; Sound.howl(false); } } else blizCool = Math.max(0, blizCool - dt / 60);
+    bliz += ((blizOn ? 1 : 0) - bliz) * .012 * dt;
+    if (bliz > .3) {
+      const breath = (x, y) => { if (Math.random() < .015 * dt) smoke.push({ x: x + (Math.random() - .5) * 3, y, r: S * .004, a: .35, vy: -.25 }); };
+      skaters.forEach(sk => breath(sk.x + sk.face * sk.h * .12, sk.y - sk.h * .62));
+      kids.forEach(k => { const [kx, ky] = kidPos(k); breath(kx, ky - k.h * (k.st === 'climb' ? .62 : .45)); });
+    }
+    if (bliz > .02) windT += (blizDir * (4.2 + Math.sin(T * .7) * 1.6) - windT) * .05 * dt * bliz;
+    storm += ((stormOn || blizOn ? 1 : 0) - storm) * .025 * dt;
     treeBoost = Math.max(0, treeBoost - .02 * dt); cabinFlash = Math.max(0, cabinFlash - .012 * dt);
     snowHop = Math.max(0, snowHop - .03 * dt); sledBoost = Math.max(0, sledBoost - dt / 60);
     aurora += ((auroraOn ? 1 : 0) - aurora) * .02 * dt;
@@ -1184,6 +1217,22 @@ const Scene = (() => {
       fx.fillStyle = '#f8fbff'; fx.fill(); fx.restore();
     }
 
+    // harsh winter storm: white-out and wind-driven streaks, the cabin window glowing through
+    if (bliz > .01) {
+      fx.fillStyle = `rgba(206,216,236,${.34 * bliz})`; fx.fillRect(0, 0, W, H);
+      fx.globalAlpha = .6 * bliz; fx.strokeStyle = '#ffffff'; fx.lineWidth = 1.4; fx.beginPath();
+      for (let i = 0; i < 150; i++) {
+        const sp = 650 + (i * 37 % 320), span = W + 240, len = 22 + i % 42;
+        const x = ((i * 173.3 + T * sp * blizDir) % span + span) % span - 120, y = (i * 91.7 + T * (130 + i % 60)) % (H + 40) - 20;
+        fx.moveTo(x, y); fx.lineTo(x - blizDir * len, y - len * .2);
+      }
+      fx.stroke(); fx.globalAlpha = 1;
+      const w = cabin.win, wx = w.x + w.w / 2 - oM, wy = w.y + w.h / 2 - vM, gR = w.w * 2.6;
+      fx.globalCompositeOperation = 'lighter'; fx.globalAlpha = .55 * bliz;
+      fx.drawImage(sprites.warm, wx - gR, wy - gR, gR * 2, gR * 2);
+      fx.globalCompositeOperation = 'source-over'; fx.globalAlpha = 1;
+    }
+
     // sparkles
     fx.globalCompositeOperation = 'lighter';
     for (let i = sparks.length - 1; i >= 0; i--) {
@@ -1218,6 +1267,7 @@ const Scene = (() => {
     let gr = ctx.createLinearGradient(0, wy, 0, wy + w.h);
     gr.addColorStop(0, `rgba(255,${200 + 30 * Math.min(1, fl - .6)},120,1)`); gr.addColorStop(1, '#ff8f3a');
     ctx.fillStyle = gr; ctx.fillRect(wx, wy, w.w, w.h);
+    if (mochi.st === 'inside') drawWindowBuddy(wx, wy, w.w, w.h);
     ctx.strokeStyle = '#3b2116'; ctx.lineWidth = 2.5; ctx.strokeRect(wx, wy, w.w, w.h);
     ctx.beginPath(); ctx.moveTo(wx + w.w / 2, wy); ctx.lineTo(wx + w.w / 2, wy + w.h); ctx.moveTo(wx, wy + w.h / 2); ctx.lineTo(wx + w.w, wy + w.h / 2); ctx.stroke();
     ctx.fillStyle = '#f6faff'; ctx.fillRect(wx - 3, wy + w.h - 1, w.w + 6, 4 + acc * S * .006);
@@ -1226,7 +1276,7 @@ const Scene = (() => {
     ctx.strokeStyle = '#3b2116'; ctx.lineWidth = 2; ctx.stroke();
     ctx.beginPath(); ctx.moveTo(at.x - oM - at.r, at.y - vM); ctx.lineTo(at.x - oM + at.r, at.y - vM); ctx.stroke();
     // door (opens when someone steps outside)
-    const d = cabin.door, dx = d.x - oM, dy = d.y - vM, op = walker.door;
+    const d = cabin.door, dx = d.x - oM, dy = d.y - vM, op = Math.max(walker.door, doorB);
     const doorPath = () => roundRect(ctx, dx, dy, d.w, d.h + 2, [d.w / 2, d.w / 2, 0, 0]);
     if (op > 0) {
       ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .5 * op;
@@ -1316,9 +1366,46 @@ const Scene = (() => {
   const depth = y => clamp(.6 + (y / H - .75) * 4, .55, 1.4);
   const mochiSize = () => S * (narrow ? .085 : .07) * depth(mochi.y) / 1.3;
   function mochiJump() { if (mochi.jy === 0 && mochi.vy === 0) { mochi.vy = -Math.sqrt(mochiSize() * .6); if (mochi.items.bell) Sound.jingle(); } }
-  function mochiSay(text, life = 2) { bubble(text, () => { const { oN } = OFF(); return [mochi.x - oN, mochi.box ? mochi.box.y0 - 2 : H * .8]; }, life); }
+  function mochiSay(text, life = 2) {
+    if (!BUDDIES.on) return;
+    bubble(text, () => {
+      const { oN, oM, vM } = OFF(), w = cabin.win;
+      if (mochi.st === 'inside') return [w.x + w.w / 2 - oM, w.y - vM - 4];
+      return [mochi.x - oN, mochi.box ? mochi.box.y0 - 2 : H * .8];
+    }, life);
+  }
+  const INDOORS = ['entering', 'inside', 'exiting'], BLIZZARD_ODDS = .5;   // chance a harsh storm blows in during a visit
+  function goInside(line) {
+    const m = mochi; if (INDOORS.includes(m.st) || m.st === 'toDoor') return;
+    m.st = 'toDoor'; m.trail = []; m.sawStorm = false; m.calmSaid = false; m.stormRoll = Math.random() < BLIZZARD_ODDS; if (line) mochiSay(line, 1.8);
+  }
+  function comeOut() { const m = mochi; if (m.st !== 'inside') return; m.st = 'exiting'; m.t = .9; Sound.door(); }
+  function startBlizzard() {
+    blizOn = true; blizT = 18 + Math.random() * 6; blizDir = Math.random() < .5 ? -1 : 1; Sound.howl(true);
+    if (walker.st === 'out' || walker.st === 'wave') walker.st = 'back';
+    toast(`🌨 A harsh winter storm is blowing in — ${BUDDIES.cur.name} is safe and warm inside`, 4200);
+    setTimeout(() => mochi.st === 'inside' && mochiSay('Whoa… look at that storm!', 2.8), 2200);
+    setTimeout(() => { if (!blizOn) return; const sk = skaters[1]; bubble('Brrr! So cold! ❄', () => { const { oM, vM } = OFF(); return [sk.x - oM, sk.y - vM - sk.h * 1.05]; }, 2.6); }, 3800);
+    setTimeout(() => { if (!blizOn) return; const k = kids[0]; bubble('Hot cocoa, please!', () => { const { oM, vM } = OFF(), [kx, ky] = kidPos(k); return [kx - oM, ky - vM - k.h * 1.1]; }, 2.6); }, 6000);
+  }
+  function drawWindowBuddy(wx, wy, ww, wh) {   // the buddy looking out of the cabin window
+    const m = mochi, F = BUDDIES.faces, img = m.happy > 0 ? F.happy : m.blinkT < 0 ? F.blink : F.open;
+    if (!img.complete || !img.naturalWidth) return;
+    const sz = ww * .74, look = bliz > .1 ? Math.sin(T * .8) : Math.sin(T * .3) * .4;
+    const bx = wx + ww / 2 + look * ww * .16, by = wy + wh - 1 + Math.sin(T * 2.2) * .6 - (m.happy > 0 ? Math.abs(Math.sin(T * 10)) * wh * .12 : 0);
+    ctx.save(); ctx.beginPath(); ctx.rect(wx, wy, ww, wh); ctx.clip();
+    ctx.fillStyle = 'rgba(120,60,20,.25)'; ctx.fillRect(wx, wy, ww, wh);   // a dim room behind them
+    ctx.save(); ctx.translate(bx, by); ctx.scale(look < -.2 ? -1 : 1, 1); ctx.drawImage(img, -sz / 2, -sz * .96, sz, sz); ctx.restore();
+    if (bliz > .05) {   // paws on the glass and a little breath fog
+      ctx.fillStyle = '#f6b9c2'; [-1, 1].forEach(sd => { ellipse(ctx, bx + sd * sz * .22, by - sz * .42, sz * .07, sz * .06); ctx.fill(); });
+      ctx.globalAlpha = (.25 + .2 * Math.sin(T * 2.2)) * bliz; ctx.fillStyle = '#ffffff';
+      ellipse(ctx, bx + look * ww * .05, by - sz * .36, sz * .2, sz * .08); ctx.fill(); ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  }
   function trailAdd(sx, sy) {   // a footprint the user made, for the buddy to sniff along
     const { oN, vN } = OFF(), m = mochi;
+    if (INDOORS.includes(m.st) || !BUDDIES.on) return;
     m.trail.push([sx + oN, sy + vN + 2]); if (m.trail.length > 90) m.trail.shift();
     if (m.st === 'idle' || m.st === 'walk') { m.st = 'follow'; if (Math.random() < .5) mochiSay(['Ooh, footprints!', 'Sniff sniff…', 'Wait for me! ♡'][(Math.random() * 3) | 0], 1.6); }
   }
@@ -1340,16 +1427,37 @@ const Scene = (() => {
     m.gift = extraGifts[0] || null;
   }
   function updateMochi(dt, oN, vN) {
+    if (!BUDDIES.on) { mochi.box = null; doorB += -doorB * .12 * dt; return; }
     const m = mochi, sec = dt / 60;
     m.t -= sec; m.blinkT -= sec; m.happy = Math.max(0, m.happy - sec); m.squash = Math.max(0, m.squash - .06 * dt);
     m.cheeks = Math.max(0, m.cheeks - sec / 25); if (m.items.blanket) m.items.blanket = Math.max(0, m.items.blanket - sec);
     if (m.blinkT < -.13) m.blinkT = 2 + Math.random() * 3;
+    const { oM, vM } = OFF(), dpx = cabin.door.x + cabin.door.w / 2 - oM + oN, dpy = cabin.door.gy - vM + vN;   // the doorstep, in buddy coords
+    doorB += ((m.st === 'entering' || m.st === 'exiting' ? 1 : 0) - doorB) * .12 * dt;
+    if (m.st === 'idle' && !m.gift && !blizOn && (m.homeT -= sec) <= 0) goInside(['Cocoa time! ☕', 'Time to warm up~'][(Math.random() * 2) | 0]);
     // decide where to go: a present first, then footprints, otherwise potter about
-    if (m.gift && m.st !== 'opening') {
+    if (INDOORS.includes(m.st)) {
+      m.box = null;
+      if (m.st === 'entering' && m.t <= 0) { m.st = 'inside'; m.inT = 0; }
+      if (m.st === 'exiting') {
+        m.x = dpx; m.y = dpy + 3;
+        if (m.t <= 0) {
+          m.st = 'idle'; m.t = 1.5; m.homeT = 100 + Math.random() * 60; m.happy = 1.5; m.dir = 1; mochiJump();
+          mochiSay(m.sawStorm ? ['Phew, it stopped! ❄', 'So much snow!! ♡'][(Math.random() * 2) | 0] : 'That was cozy! ♡', 2.4);
+        }
+      }
+      if (m.st === 'inside') {
+        m.inT += sec;
+        if (!blizOn && !m.sawStorm && m.stormRoll && m.inT > 4 && blizCool <= 0) { m.sawStorm = true; startBlizzard(); }
+        if (!m.stormRoll && !m.calmSaid && m.inT > 5) { m.calmSaid = true; mochiSay(['A calm, cozy night~ ♡', 'No storm today! ☕'][(Math.random() * 2) | 0], 2.4); }
+        if ((m.sawStorm && !blizOn && bliz < .15 && m.inT > 8) || (!m.sawStorm && m.inT > 16)) comeOut();
+      }
+    } else if (m.gift && m.st !== 'opening') {
       m.st = 'toGift'; const side = m.x < m.gift.x ? -1 : 1;
       m.tx = m.gift.x + side * m.gift.w * .95; m.ty = m.gift.by + 2;
     } else if (m.st === 'follow') {
       if (m.trail.length) { [m.tx, m.ty] = m.trail[0]; }
+      else if (Math.hypot(m.x - dpx, m.y - dpy) < S * .05) goInside('Knock knock! ♡');   // the trail led to the door
       else { m.st = 'idle'; m.t = 1.5 + Math.random() * 2; if (Math.random() < .5) mochiSay(['Hehe~ found you! ♡', 'Where to next?'][(Math.random() * 2) | 0], 1.8); }
     } else if (m.st === 'idle' && m.t <= 0) {
       m.st = 'walk'; m.t = 4;
@@ -1358,7 +1466,8 @@ const Scene = (() => {
       m.squash = .5 + .5 * Math.sin(T * 30);
       if (m.t <= 0) { m.st = 'idle'; m.t = 2; if (m.gift) openGift(m.gift, oN, vN); }
     }
-    if (m.st === 'walk' || m.st === 'follow' || m.st === 'toGift') {
+    if (m.st === 'toDoor') { m.tx = dpx; m.ty = dpy; }
+    if (m.st === 'walk' || m.st === 'follow' || m.st === 'toGift' || m.st === 'toDoor') {
       const dx = m.tx - m.x, dy = m.ty - m.y, d = Math.hypot(dx, dy), sp = S * (m.st === 'walk' ? .0007 : .0016) * dt * depth(m.y) / 1.3;
       if (Math.abs(dx) > 1) m.dir = dx > 0 ? 1 : -1;
       m.ph += (m.st === 'walk' ? .24 : .42) * dt;
@@ -1366,6 +1475,7 @@ const Scene = (() => {
         m.x = m.tx; m.y = m.ty;
         if (m.st === 'follow') m.trail.shift();
         else if (m.st === 'toGift') { m.st = 'opening'; m.t = 1.1; m.dir = m.x < m.gift.x ? 1 : -1; }
+        else if (m.st === 'toDoor') { m.st = 'entering'; m.t = 1; Sound.door(); }
         else { m.st = 'idle'; m.t = 1 + Math.random() * 3; m.ph = 0; }
       } else { m.x += dx / d * sp; m.y += dy / d * sp; }
       if (m.st === 'walk' && m.t <= 0) { m.st = 'idle'; m.t = 1.5; m.ph = 0; }
@@ -1374,12 +1484,19 @@ const Scene = (() => {
       m.vy += .5 * dt; m.jy += m.vy * dt;
       if (m.jy >= 0) { m.jy = 0; m.vy = 0; m.squash = 1; puff(m.x - oN, m.y - vN, 5, .6); }
     }
-    if (storm > .6 && !m.brr) { m.brr = true; mochiSay(m.items.blanket ? 'Snug in my blanket~' : BUDDIES.cur.cold || 'Brrr… ❄'); } else if (storm < .1) m.brr = false;
+    if (storm > .6 && !m.brr && !INDOORS.includes(m.st)) { m.brr = true; mochiSay(m.items.blanket ? 'Snug in my blanket~' : BUDDIES.cur.cold || 'Brrr… ❄'); } else if (storm < .1) m.brr = false;
   }
   function renderMochi(oN, vN) {
+    const m = mochi; if (m.st === 'inside' || !BUDDIES.on) return;
+    const fade = m.st === 'entering' ? clamp(m.t, 0, 1) : m.st === 'exiting' ? 1 - clamp(m.t / .9, 0, 1) : 1;
+    if (fade < 1) { ctx.save(); ctx.globalAlpha = fade; }
+    renderMochiBody(oN, vN - (1 - fade) * mochiSize() * .12);
+    if (fade < 1) ctx.restore();
+  }
+  function renderMochiBody(oN, vN) {
     const m = mochi, sz = mochiSize(), u = sz / 120;
     const x = m.x - oN + (storm > .4 && !m.items.blanket && buddyKey !== 'snowman' ? Math.sin(T * 60) * sz * .015 * storm : 0), gy = m.y - vN;
-    const moving = m.st === 'walk' || m.st === 'follow' || m.st === 'toGift';
+    const moving = m.st === 'walk' || m.st === 'follow' || m.st === 'toGift' || m.st === 'toDoor';
     const bob = moving ? Math.abs(Math.sin(m.ph)) * sz * .06 : 0;
     const sq = Math.sin(m.squash * Math.PI) * .16, breath = Math.sin(T * 2.2) * .02;
     ctx.fillStyle = 'rgba(80,100,150,.25)'; ellipse(ctx, x, gy, sz * .4 / (1 - m.jy / (sz * 2)), sz * .07); ctx.fill();
@@ -1479,7 +1596,8 @@ const Scene = (() => {
       gift(ctx, x, y, g.w, g.h, g.col, g.rib); ctx.restore();
       if (g.y >= g.by) {
         g.x = g.tx; extraGifts.push(g); dropGift = null; puff(x, y, 10); Sound.magic();
-        setTimeout(() => mochiGiftFor(g), 700);
+        if (BUDDIES.on) setTimeout(() => mochiGiftFor(g), 700);
+        else bubble('A present for you! 🎁', () => { const { oN, vN } = OFF(); return [g.x - oN, g.by - vN - g.h * 1.4]; }, 3);
       }
     }
   }
@@ -1496,7 +1614,7 @@ const Scene = (() => {
   function updateWalker(dt) {
     const w = walker, d = cabin.door, doorX = d.x + d.w / 2, target = doorX + S * .15, sp = .5 * dt * S / 900;
     switch (w.st) {
-      case 'in': w.t -= dt / 60; if (w.t <= 0) { w.st = 'opening'; Sound.door(); } break;
+      case 'in': if (!blizOn) w.t -= dt / 60; if (w.t <= 0) { w.st = 'opening'; Sound.door(); } break;
       case 'opening': w.door = Math.min(1, w.door + .03 * dt); if (w.door >= 1) { w.st = 'out'; w.x = doorX; w.face = 1; } break;
       case 'out': case 'back': {
         const dir = w.st === 'out' ? 1 : -1; w.face = dir; w.x += sp * dir; w.ph += .17 * dt; w.dist += sp;
@@ -1517,7 +1635,7 @@ const Scene = (() => {
   function updateKids(dt) {
     kids.forEach((k, i) => {
       switch (k.st) {
-        case 'wait': k.t -= dt / 60; if (k.t <= 0 && !kids.some(o => o !== k && o.st === 'slide' && o.s < .35)) { k.st = 'slide'; k.v = 0; } break;
+        case 'wait': if (!blizOn) k.t -= dt / 60; if (k.t <= 0 && !kids.some(o => o !== k && o.st === 'slide' && o.s < .35)) { k.st = 'slide'; k.v = 0; } break;
         case 'slide': {
           k.v += .00042 * dt * (sledBoost > 0 ? 1.8 : 1); k.s += k.v * dt;
           const [x, y] = kidPos(k), { oM, vM } = OFF();
@@ -1537,18 +1655,18 @@ const Scene = (() => {
         const sx = sledX(Math.min(1, k.s + .1)), sy = gMid(sx) + S * .003 - vM;
         ctx.strokeStyle = '#d9c7a5'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(x - u * 2, y - u * 6); ctx.lineTo(sx - oM + u * 3, sy - u * 1); ctx.stroke();
         sled(ctx, sx - oM, sy, u, slope(sx), -1);
-        person(ctx, x, y, k.h, { coat: k.coat, hat: k.hat, scarf: k.scarf, face: 1, ph: k.ph, pull: true, tilt: tilt * .4 });
+        person(ctx, x, y, k.h, { coat: k.coat, hat: k.hat, scarf: k.scarf, face: 1, ph: k.ph, pull: true, tilt: tilt * .4, shiver: bliz });
       } else {
         const wob = k.st === 'wait' ? Math.sin(T * 6) * .04 : 0;
         sled(ctx, x, y, u, tilt + wob, -1);
-        person(ctx, x + u * .6, y - u * .9, k.h, { coat: k.coat, hat: k.hat, scarf: k.scarf, face: -1, sit: true, tilt: tilt + wob, ph: k.ph });
+        person(ctx, x + u * .6, y - u * .9, k.h, { coat: k.coat, hat: k.hat, scarf: k.scarf, face: -1, sit: true, tilt: tilt + wob, ph: k.ph, shiver: bliz });
       }
     }
   }
 
   function updateSkaters(dt) {
     skaters.forEach(s => {
-      s.a += s.sp * dt; s.ph += .07 * dt; s.spin = Math.max(0, s.spin - .022 * dt);
+      s.a += s.sp * dt * (1 - .65 * bliz); s.ph += .07 * dt * (1 - .5 * bliz); s.spin = Math.max(0, s.spin - .022 * dt);
       s.x = pond.x + Math.cos(s.a) * pond.rx * .68; s.y = pond.y + Math.sin(s.a) * pond.ry * .5;
       s.face = -Math.sin(s.a) >= 0 ? 1 : -1;
       if (frameN % 3 === 0) { s.trail.push([s.x, s.y]); if (s.trail.length > 46) s.trail.shift(); }
@@ -1571,7 +1689,7 @@ const Scene = (() => {
     skaters.forEach(s => { ctx.save(); ctx.translate(0, 2 * (s.y - vM)); ctx.scale(1, -1); person(ctx, s.x - oM, s.y - vM, s.h, skaterOpts(s)); ctx.restore(); });
     ctx.globalAlpha = 1; ctx.restore();
   }
-  const skaterOpts = s => ({ coat: s.coat, hat: s.hat, scarf: s.scarf, face: s.face, ph: s.ph, glide: true, skates: true, arms: true,
+  const skaterOpts = s => ({ coat: s.coat, hat: s.hat, scarf: s.scarf, face: s.face, ph: s.ph, glide: true, skates: true, arms: bliz < .3, hug: bliz >= .3, shiver: bliz,
     tilt: s.face * .1, sx: s.spin > 0 ? Math.cos((1 - s.spin) * Math.PI * 6) : 1 });
 
   function burst(x, y, n = 22, spr = sprites.gold) {
@@ -1595,6 +1713,11 @@ const Scene = (() => {
     for (const g of extraGifts) {
       const gx = g.x - oN, gy = g.by - vN;
       if (Math.abs(x - gx) < g.w * .8 && y > gy - g.h * 1.5 && y < gy + 6) {
+        if (!BUDDIES.on) {   // no buddy: the reader opens it
+          extraGifts.splice(extraGifts.indexOf(g), 1); burst(gx, gy - g.h * .6, 40, 'mix'); puff(gx, gy, 8); Sound.magic();
+          const inside = ['a big warm hug 🤗', 'a year full of good luck 🍀', 'endless hot cocoa ☕', 'sweet dreams all winter 🌙', 'lots of laughter with friends 😊', 'a sky full of wishes come true ✨'];
+          toast('🎁 Inside: ' + inside[(Math.random() * inside.length) | 0], 3400); return 'gift';
+        }
         burst(gx, gy - g.h * .6, 10, sprites.gold); Sound.boop();
         if (!mochi.gift) mochiGiftFor(g); else mochiSay('That one’s mine too! ♡', 1.8);
         return 'gift';
@@ -1648,6 +1771,18 @@ const Scene = (() => {
       }
       pattern = (pattern + 1) % 3; treeBoost = 1; Sound.treeChime(); playTrack('silent', '🎄');
       burst(tree.star.x - oN, tree.star.y - vN, 30, 'mix'); return 'tree';
+    }
+    const cw = cabin.win, cd = cabin.door;
+    if (mochi.st === 'inside' && x > cw.x - oM - 6 && x < cw.x + cw.w - oM + 6 && y > cw.y - vM - 6 && y < cw.y + cw.h - vM + 6) {
+      mochi.happy = 1.6; Sound.squeak(BUDDIES.cur.voice); burst(x, y, 10, sprites.warm);
+      mochiSay(blizOn ? ['So cozy in here~', 'Look at all that snow!', 'Brr, it’s wild out there!'][(Math.random() * 3) | 0] : ['Hi hi! ♡', 'Cocoa is yummy ☕'][(Math.random() * 2) | 0]);
+      return 'window';
+    }
+    if (BUDDIES.on && x > cd.x - oM - 8 && x < cd.x + cd.w - oM + 8 && y > cd.y - vM - 8 && y < cd.gy - vM + 6) {
+      cabinFlash = 1; Sound.cabin();
+      if (mochi.st === 'inside') { if (blizOn) mochiSay('Too stormy out there! ❄'); else comeOut(); }
+      else if (!INDOORS.includes(mochi.st)) goInside(['Ooh, cocoa time! ☕', 'Coming in~ ♡'][(Math.random() * 2) | 0]);
+      return 'door';
     }
     if (inBox(cabin.box, x, y, oM, vM)) {
       cabinFlash = 1; Sound.cabin();
@@ -1720,6 +1855,7 @@ const Scene = (() => {
   function start() { build(); bind(); requestAnimationFrame(t => { last = t; draw(t); }); }
   function setBuddy(key, greet) {
     if (!BUDDIES.valid(key)) return; buddyKey = key;
+    if (!BUDDIES.on) { Object.assign(mochi, { st: 'idle', trail: [], gift: null, box: null }); return; }
     if (greet) { mochi.happy = 1.6; mochiJump(); mochiSay(BUDDIES.cur.hi, 1.8); Sound.squeak(BUDDIES.cur.voice); }
   }
   return { start, setBuddy, clearPaper: () => { if (paperPile) paperPile.fill(0); } };
@@ -1824,15 +1960,17 @@ const HINTS = [
   'tap the sledders, the skaters, the snowman or the tree — each one plays a different song 🎵',
   'say hi to {buddy} ♡ — leave footprints in the snow for {buddy} to follow',
   'tap the cabin to call someone outside · tap the moon for northern lights 🌌',
+  'tap the cabin door to send {buddy} inside — then keep an eye on the window, a storm might blow in 🪟',
   'drag on the snow to leave footprints · press &amp; hold for a snowstorm ❄',
   'snow piles up on the trees, the roof and the snowman — tap them to shake it off ❄',
   'snow settles on your letter too — tap its top edge to brush it off',
-  'catch a shooting star 🌠 … Santa might fly by with a present for {buddy}'
+  'catch a shooting star 🌠 … Santa might fly by with a present for {buddy}',
+  'catch a shooting star 🌠 … Santa might fly by and drop you a present'
 ];
 function hint(i = 0) {
-  const h = $('#hint'); clearTimeout(hint.t);
-  if (i >= HINTS.length) { h.classList.remove('show'); return; }
-  hint.i = i; h.innerHTML = HINTS[i].replaceAll('{buddy}', BUDDIES.cur.name); h.classList.add('show');
+  const h = $('#hint'), list = HINTS.filter(t => BUDDIES.on ? !t.includes('drop you a present') : !t.includes('{buddy}')); clearTimeout(hint.t);
+  if (i >= list.length) { h.classList.remove('show'); return; }
+  hint.i = i; h.innerHTML = list[i].replaceAll('{buddy}', BUDDIES.cur.name); h.classList.add('show');
   hint.t = setTimeout(() => { h.classList.remove('show'); hint.t = setTimeout(() => hint(i + 1), 1300); }, 6500);
 }
 
@@ -1857,6 +1995,11 @@ function setupComposer() {
     btn.onclick = () => { Scene.setBuddy(k, true); localStorage.setItem('xmas-card-buddy', k); mark(); };
     picker.appendChild(btn);
   }
+  const none = document.createElement('button');
+  none.className = 'buddy'; none.type = 'button'; none.dataset.k = 'none'; none.setAttribute('role', 'radio'); none.title = 'No buddy, just the scene';
+  none.innerHTML = `<img src="${BUDDIES.NONE.thumb}" alt="">None<small>just snow</small>`;
+  none.onclick = () => { Scene.setBuddy('none'); localStorage.setItem('xmas-card-buddy', 'none'); mark(); };
+  picker.appendChild(none);
   const mark = () => picker.querySelectorAll('.buddy').forEach(b => b.setAttribute('aria-checked', b.dataset.k === buddyKey));
   mark();
 

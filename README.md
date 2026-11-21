@@ -11,7 +11,7 @@ Email can't run animation or music, so the card lives on a web page and the emai
 
 ## 2. Write and send
 1. Open your hosted URL. You'll see the **"Write your card"** box. Type your message (Korean, English and emoji all work).
-   Under the message, **choose a buddy** to live in the card: Mochi the hamster, Bao the dumpling, Pudding the hippo, Biscuit the dog, Mittens the cat or Flurry the snowman.
+   Under the message, **choose a buddy** to live in the card: Mochi the hamster, Bao the dumpling, Pudding the hippo, Biscuit the dog, Mittens the cat or Flurry the snowman. Pick **None** for just the snowy scene (then Santa's presents are for the reader to open).
 2. **Preview the card** shows exactly what the recipient will see. ✎ brings you back to editing.
 3. Send it one of these ways:
    - **Open in Gmail**: opens a new Gmail draft with the link already in it.
@@ -29,6 +29,7 @@ Your message (and the buddy you picked) is stored in the link after `#`, so it n
 | Footprints you leave in the snow | your buddy sniffs along and follows them | |
 | ☃ Snowman | hops, talks and shakes the snow off its hat | We Wish You a Merry Christmas |
 | 🎄 Tree | shakes the snow off its branches, light pattern changes | Silent Night (music box) |
+| 🚪 Cabin door | your buddy walks over and goes inside, then looks out of the window (tap the window to say hi, tap the door again to call them out). Leaving footprints that end at the door works too. Half the time a harsh winter storm blows in while they're inside: howling wind, a white-out, and everyone outside shivers | |
 | 🏠 Cabin | snow slides off the roof, door opens, someone walks out, leaves footprints, waves and goes back in (also happens every ~30–45 s) | |
 | 🌙 Moon | northern lights on/off | |
 | 🌲 Pine trees behind the meadow | each one wobbles and drops its snow | |
