@@ -212,6 +212,16 @@ html,body{height:100%;overflow:hidden;background:#0b1428;color:#fff;
 .btn.primary{grid-column:1/-1;background:linear-gradient(180deg,#c43340,#9a1d29);border-color:#d9545f;font-size:19px;
   box-shadow:0 8px 22px rgba(160,30,40,.45)}
 .btn.primary:hover{background:linear-gradient(180deg,#d23d4a,#a8232f)}
+.pick-label{font-size:14px;color:#d6d9e6;margin:0 4px 6px;font-style:italic}
+.buddies{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:0 0 14px}
+.buddy{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:6px 2px 5px;cursor:pointer;
+  color:#efe2c8;font-family:inherit;font-size:13.5px;font-weight:600;display:flex;flex-direction:column;align-items:center;line-height:1.15;transition:background .2s,border-color .2s}
+.buddy img{width:46px;height:46px;margin-bottom:2px;transition:transform .2s}
+.buddy small{font-size:11.5px;font-weight:500;opacity:.65}
+.buddy:hover{background:rgba(255,255,255,.12)}.buddy:hover img{transform:translateY(-3px) rotate(-4deg)}
+.buddy[aria-checked=true]{border-color:var(--gold);background:rgba(243,207,134,.16);box-shadow:0 0 0 2px rgba(243,207,134,.3)}
+.buddy:focus-visible{outline:2px dashed var(--gold);outline-offset:2px}
+@media (max-width:440px){.buddies{grid-template-columns:repeat(3,1fr)}}
 .note{font-size:13.5px;color:#9fa8c0;margin-top:14px;line-height:1.45;text-align:center}
 .note b{color:#f3cf86;font-weight:600}
 @media (prefers-reduced-motion:reduce){.envelope{animation:none}
@@ -264,6 +274,8 @@ html,body{height:100%;overflow:hidden;background:#0b1428;color:#fff;
     <p class="lead">Your words will appear in handwriting, letter by letter.</p>
     <textarea id="msg-input" maxlength="700" spellcheck="false" aria-label="Your message"></textarea>
     <div class="meta"><span>Korean, English &amp; emoji welcome ✨</span><span id="count">0 / 700</span></div>
+    <div class="pick-label">Choose a buddy to live in your card</div>
+    <div class="buddies" id="buddies" role="radiogroup" aria-label="Choose a buddy"></div>
     <div class="actions">
       <button class="btn primary" id="btn-preview">✉&nbsp; Preview the card</button>
       <button class="btn" id="btn-link">🔗 Copy link</button>
@@ -320,8 +332,9 @@ function dec(s) {
   } catch (e) { return null; }
 }
 const hashMsg = () => { const m = new URLSearchParams(location.hash.slice(1)).get('m'); return m ? dec(m) : null; };
+const hashBuddy = () => new URLSearchParams(location.hash.slice(1)).get('c');
 const baseUrl = () => location.href.split('#')[0].split('?')[0];
-const cardLink = text => baseUrl() + '#m=' + enc(text);
+const cardLink = text => baseUrl() + '#m=' + enc(text) + (buddyKey !== 'hamster' ? '&c=' + buddyKey : '');
 
 /* ======================================================================
    Audio: a music-box "Silent Night" + interactive chimes, all synthesized
@@ -490,9 +503,9 @@ const Sound = (() => {
       o.frequency.exponentialRampToValueAtTime(1300, t + .35); o.frequency.exponentialRampToValueAtTime(700, t + .85);
     },
     jingle() { if (!ok()) return; const t = ac.currentTime; bell(N('A6'), t, .8, .05); bell(N('E7'), t + .05, .6, .035); },
-    squeak() {
+    squeak(v = 1) {
       if (!ok()) return; const t = ac.currentTime;
-      [0, .13].forEach((d, i) => { const o = osc('sine', 700 + i * 200, t + d, t + d + .14, .12, .01, sfx); o.frequency.setValueAtTime(700 + i * 200, t + d); o.frequency.exponentialRampToValueAtTime(1300 + i * 300, t + d + .09); });
+      [0, .13].forEach((d, i) => { const f = (700 + i * 200) * v, o = osc('sine', f, t + d, t + d + .14, .12, .01, sfx); o.frequency.setValueAtTime(f, t + d); o.frequency.exponentialRampToValueAtTime((1300 + i * 300) * v, t + d + .09); });
     },
     flump(v = 1) { if (!ok()) return; const t = ac.currentTime; noiseHit(t, .38, .26 * v, 'lowpass', 520, sfx, .55); noiseHit(t + .04, .3, .07 * v, 'bandpass', 2200, sfx, .8); },
     sleigh() {
@@ -515,23 +528,87 @@ const Sound = (() => {
 })();
 
 /* ======================================================================
-   Mochi: a little winter-white hamster (same art as mochi.svg), with three faces
+   Buddies: the little character who lives in the card (picked when writing).
+   All share one chubby body layout so hats, bells and puffed cheeks fit everyone.
    ====================================================================== */
-const MOCHI = (() => {
-  const body = `<defs> <radialGradient id="fur" cx="45%" cy="42%" r="65%"> <stop offset="0" stop-color="#ffffff"/><stop offset=".75" stop-color="#f7f2e8"/><stop offset="1" stop-color="#dcdde8"/> </radialGradient> </defs> <g stroke="#4a3a3a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"> <ellipse cx="42" cy="110" rx="10" ry="6" fill="#f6b9c2"/> <ellipse cx="78" cy="110" rx="10" ry="6" fill="#f6b9c2"/> <circle cx="32" cy="33" r="12" fill="#a9adbd"/> <circle cx="88" cy="33" r="12" fill="#a9adbd"/> <circle cx="31" cy="31" r="6" fill="#f6b9c2" stroke="none"/> <circle cx="89" cy="31" r="6" fill="#f6b9c2" stroke="none"/> <path d="M60 26 C92 26 108 50 106 78 C104 100 86 112 60 112 C34 112 16 100 14 78 C12 50 28 26 60 26Z" fill="url(#fur)"/> </g> <path d="M28 42 C38 27 82 27 92 42 C84 37 72 39 66 45 C62 41 58 41 54 45 C48 39 36 37 28 42Z" fill="#b8bccb"/> <path d="M60 28 L60 41" stroke="#8d92a5" stroke-width="4" stroke-linecap="round"/> <ellipse cx="33" cy="71" rx="7" ry="4" fill="#ff9aa8" opacity=".7"/> <ellipse cx="87" cy="71" rx="7" ry="4" fill="#ff9aa8" opacity=".7"/> <path d="M30 66 L18 63 M30 70 L17 71 M90 66 L102 63 M90 70 L103 71" stroke="#8a7f86" stroke-width="1.4" stroke-linecap="round"/> <g stroke="#4a3a3a" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"> <path d="M24 81 Q60 93 96 81 L97 90 Q60 102 23 90Z" fill="#c62a35"/> <path d="M72 95 L77 110 L87 106 L81 93Z" fill="#c62a35"/> <ellipse cx="50" cy="91" rx="6" ry="5" fill="#f6b9c2"/> <ellipse cx="70" cy="91" rx="6" ry="5" fill="#f6b9c2"/> <path d="M24 24 C16 12 6 14 2 10 C6 19 2 23 8 28 C14 24 19 29 24 24Z" fill="#2f7a3e"/> <path d="M24 24 C26 12 36 8 40 4 C40 14 44 18 38 24 C33 22 28 28 24 24Z" fill="#256a33"/> <circle cx="21" cy="21" r="4.5" fill="#d23440"/> <circle cx="28" cy="19" r="4.5" fill="#b3202b"/> </g> <path d="M32 86 Q60 96 88 86" stroke="#f6ead2" stroke-width="2" stroke-dasharray="3 4" fill="none"/>`;
-  const nose = '<path d="M57 65.5 L63 65.5 L60 69Z" fill="#e88a99" stroke="#c46b7a" stroke-width="1" stroke-linejoin="round"/>', mouth = '<path d="M60 69 L60 72 Q57 75 54 73 M60 72 Q63 75 66 73" stroke="#4a3a3a" stroke-width="1.8" fill="none" stroke-linecap="round"/>';
-  const eyes = {
-    open: '<circle cx="45" cy="58" r="5" fill="#2a1d1a"/><circle cx="46.8" cy="56.2" r="1.7" fill="#fff"/><circle cx="75" cy="58" r="5" fill="#2a1d1a"/><circle cx="76.8" cy="56.2" r="1.7" fill="#fff"/>' + nose + mouth,
-    blink: '<path d="M40 59 Q45 62 50 59 M70 59 Q75 62 80 59" stroke="#2a1d1a" stroke-width="2.6" fill="none" stroke-linecap="round"/>' + nose + mouth,
-    happy: '<path d="M40 60 Q45 52 50 60 M70 60 Q75 52 80 60" stroke="#2a1d1a" stroke-width="2.8" fill="none" stroke-linecap="round"/>' + nose +
-           '<path d="M54 71 Q60 81 66 71Z" fill="#d2505c" stroke="#2a1d1a" stroke-width="1.8" stroke-linejoin="round"/>'
+let buddyKey = 'hamster';
+const BUDDIES = (() => {
+  const K = '#4a3a3a';
+  const g = (inner, w = 3) => `<g stroke="${K}" stroke-width="${w}" stroke-linejoin="round" stroke-linecap="round">${inner}</g>`;
+  const grad = (a, b, c) => `<defs><radialGradient id="fur" cx="45%" cy="42%" r="65%"><stop offset="0" stop-color="${a}"/><stop offset=".75" stop-color="${b}"/><stop offset="1" stop-color="${c}"/></radialGradient></defs>`;
+  const body = g('<path d="M60 26 C92 26 108 50 106 78 C104 100 86 112 60 112 C34 112 16 100 14 78 C12 50 28 26 60 26Z" fill="url(#fur)"/>');
+  const feet = c => g(`<ellipse cx="42" cy="110" rx="10" ry="6" fill="${c}"/><ellipse cx="78" cy="110" rx="10" ry="6" fill="${c}"/>`);
+  const scarf = g('<path d="M24 81 Q60 93 96 81 L97 90 Q60 102 23 90Z" fill="#c62a35"/><path d="M72 95 L77 110 L87 106 L81 93Z" fill="#c62a35"/>') +
+    '<path d="M32 86 Q60 96 88 86" stroke="#f6ead2" stroke-width="2" stroke-dasharray="3 4" fill="none"/>';
+  const paws = c => g(`<ellipse cx="50" cy="91" rx="6" ry="5" fill="${c}"/><ellipse cx="70" cy="91" rx="6" ry="5" fill="${c}"/>`);
+  const blush = (y = 71, x = 33, c = '#ff9aa8') => `<ellipse cx="${x}" cy="${y}" rx="7" ry="4" fill="${c}" opacity=".7"/><ellipse cx="${120 - x}" cy="${y}" rx="7" ry="4" fill="${c}" opacity=".7"/>`;
+  const whiskers = '<path d="M30 66 L18 63 M30 70 L17 71 M90 66 L102 63 M90 70 L103 71" stroke="#8a7f86" stroke-width="1.4" stroke-linecap="round"/>';
+  const muzzle = (rx, ry) => `<ellipse cx="60" cy="70" rx="${rx}" ry="${ry}" fill="#fffaf2"/>`;
+  const pinkNose = '<path d="M57 65.5 L63 65.5 L60 69Z" fill="#e88a99" stroke="#c46b7a" stroke-width="1" stroke-linejoin="round"/>';
+  const wMouth = '<path d="M60 69 L60 72 Q57 75 54 73 M60 72 Q63 75 66 73" stroke="#4a3a3a" stroke-width="1.8" fill="none" stroke-linecap="round"/>';
+  const open = (y = 71, d = 10) => `<path d="M54 ${y} Q60 ${y + d} 66 ${y}Z" fill="#d2505c" stroke="#2a1d1a" stroke-width="1.8" stroke-linejoin="round"/>`;
+  const holly = (x, y) => g(`<path d="M${x} ${y} C${x - 8} ${y - 12} ${x - 18} ${y - 10} ${x - 22} ${y - 14} C${x - 18} ${y - 5} ${x - 22} ${y - 1} ${x - 16} ${y + 4} C${x - 10} ${y} ${x - 5} ${y + 5} ${x} ${y}Z" fill="#2f7a3e"/>` +
+    `<path d="M${x} ${y} C${x + 2} ${y - 12} ${x + 12} ${y - 16} ${x + 16} ${y - 20} C${x + 16} ${y - 10} ${x + 20} ${y - 6} ${x + 14} ${y} C${x + 9} ${y - 2} ${x + 4} ${y + 4} ${x} ${y}Z" fill="#256a33"/>` +
+    `<circle cx="${x - 3}" cy="${y - 3}" r="4.5" fill="#d23440"/><circle cx="${x + 4}" cy="${y - 5}" r="4.5" fill="#b3202b"/>`);
+  const EYES = {
+    open: '<circle cx="45" cy="58" r="5" fill="#2a1d1a"/><circle cx="46.8" cy="56.2" r="1.7" fill="#fff"/><circle cx="75" cy="58" r="5" fill="#2a1d1a"/><circle cx="76.8" cy="56.2" r="1.7" fill="#fff"/>',
+    blink: '<path d="M40 59 Q45 62 50 59 M70 59 Q75 62 80 59" stroke="#2a1d1a" stroke-width="2.6" fill="none" stroke-linecap="round"/>',
+    happy: '<path d="M40 60 Q45 52 50 60 M70 60 Q75 52 80 60" stroke="#2a1d1a" stroke-width="2.8" fill="none" stroke-linecap="round"/>'
   };
+  const LIST = {
+    hamster: { name: 'Mochi', kind: 'Hamster', voice: 1, hi: 'Squeak! ♡',
+      art: grad('#ffffff', '#f7f2e8', '#dcdde8') + feet('#f6b9c2') +
+        g('<circle cx="32" cy="33" r="12" fill="#a9adbd"/><circle cx="88" cy="33" r="12" fill="#a9adbd"/>') +
+        '<circle cx="31" cy="31" r="6" fill="#f6b9c2"/><circle cx="89" cy="31" r="6" fill="#f6b9c2"/>' + body +
+        '<path d="M28 42 C38 27 82 27 92 42 C84 37 72 39 66 45 C62 41 58 41 54 45 C48 39 36 37 28 42Z" fill="#b8bccb"/><path d="M60 28 L60 41" stroke="#8d92a5" stroke-width="4" stroke-linecap="round"/>' +
+        blush() + whiskers + scarf + paws('#f6b9c2') + holly(24, 24),
+      face: pinkNose + wMouth, smile: pinkNose + open() },
+    dumpling: { name: 'Bao', kind: 'Dumpling', voice: 1.12, hi: 'Boing boing! ♡',
+      art: grad('#ffffff', '#f4f1ea', '#d9dfee') + feet('#f4f1ea') + body + blush(66, 35) + scarf +
+        g('<ellipse cx="17" cy="80" rx="8" ry="10" fill="#2f7a3e"/><ellipse cx="103" cy="80" rx="8" ry="10" fill="#2f7a3e"/>') +
+        '<path d="M50 30 Q60 22 70 30 M54 26 Q60 19 66 26" stroke="#cfd3e0" stroke-width="2" fill="none" stroke-linecap="round"/>' + holly(60, 24),
+      face: '<path d="M55 67 Q60 71 65 67" stroke="#2a1d1a" stroke-width="2.2" fill="none" stroke-linecap="round"/>', smile: open(66) },
+    hippo: { name: 'Pudding', kind: 'Hippo', voice: .5, hi: 'Hip hip hooray! ♡',
+      art: grad('#e2def3', '#bdb7dc', '#9d97c4') + feet('#a49fc4') +
+        g('<circle cx="36" cy="31" r="8" fill="#b3add6"/><circle cx="84" cy="31" r="8" fill="#b3add6"/>') +
+        '<circle cx="36" cy="31" r="3.5" fill="#f6b9c2"/><circle cx="84" cy="31" r="3.5" fill="#f6b9c2"/>' + body + scarf + paws('#a49fc4') +
+        g('<ellipse cx="60" cy="74" rx="25" ry="12.5" fill="#d8d3ee"/>', 2.6) +
+        '<ellipse cx="52" cy="71" rx="2.2" ry="3" fill="#6d6690"/><ellipse cx="68" cy="71" rx="2.2" ry="3" fill="#6d6690"/>' + blush(64, 26) + holly(90, 32),
+      face: '<path d="M50 79 Q60 84 70 79" stroke="#4a3a3a" stroke-width="2" fill="none" stroke-linecap="round"/>', smile: '<path d="M51 77 Q60 89 69 77Z" fill="#d2505c" stroke="#2a1d1a" stroke-width="1.8" stroke-linejoin="round"/>' },
+    dog: { name: 'Biscuit', kind: 'Dog', voice: .65, hi: 'Woof woof! ♡',
+      art: grad('#fff4e2', '#f3d9b1', '#d9b98e') + feet('#e9c79a') + body +
+        '<ellipse cx="75" cy="56" rx="11" ry="10" fill="#c99467"/>' + muzzle(15, 10) + blush(75, 30) +
+        g('<path d="M32 30 C14 28 6 50 13 68 C20 72 28 60 33 44Z" fill="#9c6b45"/><path d="M88 30 C106 28 114 50 107 68 C100 72 92 60 87 44Z" fill="#9c6b45"/>') +
+        scarf + paws('#e9c79a') + holly(36, 30),
+      face: '<path d="M54.5 63.5 Q60 60.5 65.5 63.5 Q63.5 69 60 69 Q56.5 69 54.5 63.5Z" fill="#2a1d1a"/>' + wMouth,
+      smile: '<path d="M54.5 63.5 Q60 60.5 65.5 63.5 Q63.5 69 60 69 Q56.5 69 54.5 63.5Z" fill="#2a1d1a"/>' + open() + '<path d="M57 76 Q60 82 63 76Z" fill="#f28a9a"/>' },
+    cat: { name: 'Mittens', kind: 'Cat', voice: .85, hi: 'Meow~ ♡',
+      art: grad('#ffe3bf', '#f2b36b', '#d98f45') + feet('#fff4e6') +
+        g('<path d="M24 48 L27 12 L52 30Z" fill="#f2b36b"/><path d="M96 48 L93 12 L68 30Z" fill="#f2b36b"/>') +
+        '<path d="M29 38 L30 20 L44 30Z" fill="#f6b9c2"/><path d="M91 38 L90 20 L76 30Z" fill="#f6b9c2"/>' + body +
+        '<path d="M60 29 L60 39 M50 31 L52 39 M70 31 L68 39 M15 62 L25 64 M15 71 L25 71 M105 62 L95 64 M105 71 L95 71" stroke="#c97a30" stroke-width="3.5" stroke-linecap="round"/>' +
+        muzzle(13, 9) + blush(72, 31) + whiskers + scarf + paws('#fff4e6') + holly(88, 28),
+      face: pinkNose + wMouth, smile: pinkNose + open() },
+    snowman: { name: 'Flurry', kind: 'Snowman', voice: .78, hi: 'Snow-ho-ho! ❄', cold: 'I love this weather! ❄',
+      art: grad('#ffffff', '#eef3fb', '#c9d6ee') + feet('#eef3fb') + body +
+        '<path d="M17 80 L3 66 M8 71 L1 72 M103 80 L117 66 M112 71 L119 72" stroke="#6b4a2e" stroke-width="3" stroke-linecap="round"/>' +
+        '<path d="M22 50 Q60 4 98 50" stroke="#2f6fb0" stroke-width="5" fill="none" stroke-linecap="round"/>' +
+        g('<circle cx="19" cy="53" r="9.5" fill="#8fc3f0"/><circle cx="101" cy="53" r="9.5" fill="#8fc3f0"/>') + blush(70, 31) + scarf +
+        '<circle cx="60" cy="104" r="2.6" fill="#2a1d1a"/>',
+      face: '<path d="M59 64 L82 69 L59 71Z" fill="#f08a2c" stroke="#b8611c" stroke-width="1" stroke-linejoin="round"/>' +
+        [[52, 76], [56, 78.5], [60, 79.5], [64, 78.5], [68, 76]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="1.6" fill="#2a1d1a"/>`).join(''),
+      smile: '<path d="M53 75 Q60 86 67 75Z" fill="#d2505c" stroke="#2a1d1a" stroke-width="1.8" stroke-linejoin="round"/><path d="M59 64 L82 69 L59 71Z" fill="#f08a2c" stroke="#b8611c" stroke-width="1" stroke-linejoin="round"/>' }
+  };
+  const svg = (b, face) => `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">${b.art}${face}</svg>`;
+  const url = s => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(s);
   const img = {};
-  for (const k in eyes) {
-    img[k] = new Image();
-    img[k].src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">${body}${eyes[k]}</svg>`);
+  for (const k in LIST) {
+    const b = LIST[k], faces = { open: EYES.open + b.face, blink: EYES.blink + b.face, happy: EYES.happy + b.smile };
+    b.svg = svg(b, faces.open); b.thumb = url(b.svg); img[k] = {};
+    if (typeof Image !== 'undefined') for (const f in faces) { img[k][f] = new Image(); img[k][f].src = url(svg(b, faces[f])); }
   }
-  return img;
+  const valid = k => Object.prototype.hasOwnProperty.call(LIST, k);
+  return { LIST, img, valid, get cur() { return LIST[buddyKey]; }, get faces() { return img[buddyKey]; } };
 })();
 
 /* ======================================================================
@@ -972,11 +1049,19 @@ const Scene = (() => {
     drawPines(oM, vM);
 
     drawCabinLive(dt, oM, vM);
-    updateWalker(dt);
+    updateWalker(dt); updateKids(dt); updateSkaters(dt); updateMochi(dt, oN, vN);
+    // the buddy is drawn among whichever characters share its depth: behind the near snowbank it
+    // belongs to the meadow (walker, sledders, skaters); in front of it, to the foreground.
+    const mochiBack = mochi.y < gNear(mochi.x) - 1, depthSorted = list => list.sort((a, b) => a[0] - b[0]).forEach(([, f]) => f());
+    drawPond(oM, vM);
+    const meadow = kids.map(k => [kidPos(k)[1] - vM, () => drawKid(k, oM, vM)]);
+    skaters.forEach(sk => meadow.push([sk.y - vM, () => person(ctx, sk.x - oM, sk.y - vM, sk.h, skaterOpts(sk))]));
     if (walker.st === 'out' || walker.st === 'wave' || walker.st === 'back') {
-      const wy = gMid(walker.x) + S * .004;
-      person(ctx, walker.x - oM, Math.min(wy, cabin.door.gy) - vM, walkerH, { coat: '#2c6e49', hat: '#c62a35', scarf: '#f1c75b', face: walker.face, ph: walker.ph, wave: walker.st === 'wave' ? T * 9 : null });
+      const wy = Math.min(gMid(walker.x) + S * .004, cabin.door.gy) - vM;
+      meadow.push([wy, () => person(ctx, walker.x - oM, wy, walkerH, { coat: '#2c6e49', hat: '#c62a35', scarf: '#f1c75b', face: walker.face, ph: walker.ph, wave: walker.st === 'wave' ? T * 9 : null })]);
     }
+    if (mochiBack) meadow.push([mochi.y - vN, () => renderMochi(oN, vN)]);
+    depthSorted(meadow);
     // chimney smoke
     if (Math.random() < .11 * dt) smoke.push({ x: cabin.chimney.x + (Math.random() - .5) * 4, y: cabin.chimney.y - S * .008 * acc, r: S * .01, a: .3, vy: -.3 - Math.random() * .2 });
     for (let i = smoke.length - 1; i >= 0; i--) {
@@ -986,11 +1071,7 @@ const Scene = (() => {
     }
     ctx.globalAlpha = 1;
 
-    updateKids(dt); drawKids(oM, vM);
-    updateSkaters(dt); drawPond(oM, vM);
-
     ctx.drawImage(L.near.c, -M - oN, -vN, L.near.w, L.near.h);
-    drawGifts(dt, oN, vN);
 
     // footprints (slowly filled in by new snow)
     for (let i = prints.length - 1; i >= 0; i--) {
@@ -1000,11 +1081,6 @@ const Scene = (() => {
       ctx.fillStyle = `rgba(100,122,175,${p.a * .5})`;
       ctx.beginPath(); ctx.ellipse(p.x - oM + nx, p.y - vM + ny, sz * 1.25, sz * .6, p.ang * .25, 0, 7); ctx.fill();
     }
-
-    // snowman (alive)
-    const hop = snowHop > 0 ? -Math.sin((1 - snowHop) * Math.PI) * S * .025 : 0;
-    snowmanAt.box = snowman(ctx, snowmanAt.x - oN, snowmanAt.by - vN + hop, snowmanAt.s, hatAcc);
-    drawMochi(dt, oN, vN);
 
     // tree snow, lights + star
     const tsnow = drawTreeSnow(dt, oN, vN), wob = treeShake > 0 ? Math.sin(T * 50) * treeShake * S * .004 : 0;
@@ -1032,6 +1108,15 @@ const Scene = (() => {
     for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, r = k % 2 ? sr * .42 : sr; ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r); }
     ctx.closePath(); const sg = ctx.createRadialGradient(0, -sr * .2, 0, 0, 0, sr); sg.addColorStop(0, '#fff8de'); sg.addColorStop(1, '#f0b93a');
     ctx.fillStyle = sg; ctx.fill(); ctx.restore();
+
+
+    // foreground: snowman, Santa's presents and the buddy, nearest last
+    const hop = snowHop > 0 ? -Math.sin((1 - snowHop) * Math.PI) * S * .025 : 0;
+    const front = [[snowmanAt.by - vN, () => { snowmanAt.box = snowman(ctx, snowmanAt.x - oN, snowmanAt.by - vN + hop, snowmanAt.s, hatAcc); }]];
+    extraGifts.forEach(g => front.push([g.by - vN, () => drawLandedGift(g, oN, vN)]));
+    if (!mochiBack) front.push([mochi.y - vN, () => renderMochi(oN, vN)]);
+    depthSorted(front);
+    drawGifts(dt, oN, vN);   // a present still floating down on its parachute
 
     // clumps of snow shaken off trees and roofs
     for (let i = clumps.length - 1; i >= 0; i--) {
@@ -1227,12 +1312,12 @@ const Scene = (() => {
     return avg;
   }
 
-  /* ---------------- Mochi the hamster: wanders, follows your footprints, opens her presents ---------------- */
+  /* ---------------- the buddy (Mochi the hamster by default): wanders, follows your footprints, opens Santa's presents ---------------- */
   const depth = y => clamp(.6 + (y / H - .75) * 4, .55, 1.4);
   const mochiSize = () => S * (narrow ? .085 : .07) * depth(mochi.y) / 1.3;
   function mochiJump() { if (mochi.jy === 0 && mochi.vy === 0) { mochi.vy = -Math.sqrt(mochiSize() * .6); if (mochi.items.bell) Sound.jingle(); } }
   function mochiSay(text, life = 2) { bubble(text, () => { const { oN } = OFF(); return [mochi.x - oN, mochi.box ? mochi.box.y0 - 2 : H * .8]; }, life); }
-  function trailAdd(sx, sy) {   // a footprint the user made, for Mochi to sniff along
+  function trailAdd(sx, sy) {   // a footprint the user made, for the buddy to sniff along
     const { oN, vN } = OFF(), m = mochi;
     m.trail.push([sx + oN, sy + vN + 2]); if (m.trail.length > 90) m.trail.shift();
     if (m.st === 'idle' || m.st === 'walk') { m.st = 'follow'; if (Math.random() < .5) mochiSay(['Ooh, footprints!', 'Sniff sniff…', 'Wait for me! ♡'][(Math.random() * 3) | 0], 1.6); }
@@ -1251,10 +1336,10 @@ const Scene = (() => {
     if (item === 'seed') m.cheeks = 1;
     if (item === 'mitten') m.items.blanket = 12;
     m.happy = 3; m.opened++; mochiJump(); mochiSay(GIFT_ITEMS[item], 3);
-    if (m.opened === 1) toast('🎁 Mochi opened her present from Santa!', 2800);
+    if (m.opened === 1) toast(`🎁 ${BUDDIES.cur.name} opened a present from Santa!`, 2800);
     m.gift = extraGifts[0] || null;
   }
-  function drawMochi(dt, oN, vN) {
+  function updateMochi(dt, oN, vN) {
     const m = mochi, sec = dt / 60;
     m.t -= sec; m.blinkT -= sec; m.happy = Math.max(0, m.happy - sec); m.squash = Math.max(0, m.squash - .06 * dt);
     m.cheeks = Math.max(0, m.cheeks - sec / 25); if (m.items.blanket) m.items.blanket = Math.max(0, m.items.blanket - sec);
@@ -1289,14 +1374,16 @@ const Scene = (() => {
       m.vy += .5 * dt; m.jy += m.vy * dt;
       if (m.jy >= 0) { m.jy = 0; m.vy = 0; m.squash = 1; puff(m.x - oN, m.y - vN, 5, .6); }
     }
-    if (storm > .6 && !m.brr) { m.brr = true; mochiSay(m.items.blanket ? 'Snug in my blanket~' : 'Brrr… ❄'); } else if (storm < .1) m.brr = false;
-    const sz = mochiSize(), u = sz / 120;
-    const x = m.x - oN + (storm > .4 && !m.items.blanket ? Math.sin(T * 60) * sz * .015 * storm : 0), gy = m.y - vN;
+    if (storm > .6 && !m.brr) { m.brr = true; mochiSay(m.items.blanket ? 'Snug in my blanket~' : BUDDIES.cur.cold || 'Brrr… ❄'); } else if (storm < .1) m.brr = false;
+  }
+  function renderMochi(oN, vN) {
+    const m = mochi, sz = mochiSize(), u = sz / 120;
+    const x = m.x - oN + (storm > .4 && !m.items.blanket && buddyKey !== 'snowman' ? Math.sin(T * 60) * sz * .015 * storm : 0), gy = m.y - vN;
     const moving = m.st === 'walk' || m.st === 'follow' || m.st === 'toGift';
     const bob = moving ? Math.abs(Math.sin(m.ph)) * sz * .06 : 0;
     const sq = Math.sin(m.squash * Math.PI) * .16, breath = Math.sin(T * 2.2) * .02;
     ctx.fillStyle = 'rgba(80,100,150,.25)'; ellipse(ctx, x, gy, sz * .4 / (1 - m.jy / (sz * 2)), sz * .07); ctx.fill();
-    const img = m.happy > 0 ? MOCHI.happy : m.blinkT < 0 ? MOCHI.blink : MOCHI.open;
+    const F = BUDDIES.faces, img = m.happy > 0 ? F.happy : m.blinkT < 0 ? F.blink : F.open;
     if (img.complete && img.naturalWidth) {
       ctx.save(); ctx.translate(x, gy + m.jy - bob);
       ctx.rotate(moving ? Math.sin(m.ph) * .07 : 0); ctx.scale(m.dir * (1 + sq * .8), 1 - sq + breath);
@@ -1395,7 +1482,9 @@ const Scene = (() => {
         setTimeout(() => mochiGiftFor(g), 700);
       }
     }
-    for (const g of extraGifts) {
+  }
+  function drawLandedGift(g, oN, vN) {
+    {
       const x = g.x - oN, y = g.by - vN;
       gift(ctx, x, y, g.w, g.h, g.col, g.rib);
       ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = .25 + .2 * Math.sin(T * 3 + g.tx);
@@ -1441,8 +1530,8 @@ const Scene = (() => {
       }
     });
   }
-  function drawKids(oM, vM) {
-    kids.forEach(k => {
+  function drawKid(k, oM, vM) {
+    {
       const [x0, y0] = kidPos(k), x = x0 - oM, y = y0 - vM, tilt = slope(x0), u = k.h / 10;
       if (k.st === 'climb') {
         const sx = sledX(Math.min(1, k.s + .1)), sy = gMid(sx) + S * .003 - vM;
@@ -1454,7 +1543,7 @@ const Scene = (() => {
         sled(ctx, x, y, u, tilt + wob, -1);
         person(ctx, x + u * .6, y - u * .9, k.h, { coat: k.coat, hat: k.hat, scarf: k.scarf, face: -1, sit: true, tilt: tilt + wob, ph: k.ph });
       }
-    });
+    }
   }
 
   function updateSkaters(dt) {
@@ -1481,7 +1570,6 @@ const Scene = (() => {
     ctx.globalAlpha = .2;
     skaters.forEach(s => { ctx.save(); ctx.translate(0, 2 * (s.y - vM)); ctx.scale(1, -1); person(ctx, s.x - oM, s.y - vM, s.h, skaterOpts(s)); ctx.restore(); });
     ctx.globalAlpha = 1; ctx.restore();
-    [...skaters].sort((a, b) => a.y - b.y).forEach(s => person(ctx, s.x - oM, s.y - vM, s.h, skaterOpts(s)));
   }
   const skaterOpts = s => ({ coat: s.coat, hat: s.hat, scarf: s.scarf, face: s.face, ph: s.ph, glide: true, skates: true, arms: true,
     tilt: s.face * .1, sx: s.spin > 0 ? Math.cos((1 - s.spin) * Math.PI * 6) : 1 });
@@ -1503,7 +1591,7 @@ const Scene = (() => {
       burst(x, y, 34, sprites.white); Sound.magic(); shoot = null;
       toast('🌠 You caught a shooting star — make a wish!', 3200); if (!sleigh) nextSleigh = Math.min(nextSleigh, 1.6); return 'star';
     }
-    // presents the sleigh dropped → they're Mochi's
+    // presents the sleigh dropped → they're the buddy's
     for (const g of extraGifts) {
       const gx = g.x - oN, gy = g.by - vN;
       if (Math.abs(x - gx) < g.w * .8 && y > gy - g.h * 1.5 && y < gy + 6) {
@@ -1512,10 +1600,10 @@ const Scene = (() => {
         return 'gift';
       }
     }
-    // Mochi
+    // the buddy
     if (inBox(mochi.box, x, y, 0, 0)) {
-      mochiJump(); mochi.happy = 1.8; Sound.squeak(); burst(x, y - 10, 14, sprites.pink);
-      const lines = mochi.cheeks > 0 ? ['Mmf! (nom nom)', 'Mmmf ♡'] : ['Squeak! ♡', 'Merry Christmas!', 'Hehe~', 'Snow! ❄', 'Hug? ♡', 'Hi hi!'];
+      mochiJump(); mochi.happy = 1.8; Sound.squeak(BUDDIES.cur.voice); burst(x, y - 10, 14, sprites.pink);
+      const lines = mochi.cheeks > 0 ? ['Mmf! (nom nom)', 'Mmmf ♡'] : [BUDDIES.cur.hi, 'Merry Christmas!', 'Hehe~', 'Snow! ❄', 'Hug? ♡', 'Hi hi!'];
       mochiSay(lines[(Math.random() * lines.length) | 0]); return 'mochi';
     }
     // moon → northern lights
@@ -1630,7 +1718,11 @@ const Scene = (() => {
   }
 
   function start() { build(); bind(); requestAnimationFrame(t => { last = t; draw(t); }); }
-  return { start, clearPaper: () => { if (paperPile) paperPile.fill(0); } };
+  function setBuddy(key, greet) {
+    if (!BUDDIES.valid(key)) return; buddyKey = key;
+    if (greet) { mochi.happy = 1.6; mochiJump(); mochiSay(BUDDIES.cur.hi, 1.8); Sound.squeak(BUDDIES.cur.voice); }
+  }
+  return { start, setBuddy, clearPaper: () => { if (paperPile) paperPile.fill(0); } };
 })();
 
 /* ======================================================================
@@ -1730,17 +1822,17 @@ function showCard(msg, instant = false) {
 const HINTS = [
   'fold the letter (bottom right of it) to see the whole snowy scene ✉',
   'tap the sledders, the skaters, the snowman or the tree — each one plays a different song 🎵',
-  'say hi to Mochi the hamster ♡ — leave footprints in the snow and she’ll follow them',
+  'say hi to {buddy} ♡ — leave footprints in the snow for {buddy} to follow',
   'tap the cabin to call someone outside · tap the moon for northern lights 🌌',
   'drag on the snow to leave footprints · press &amp; hold for a snowstorm ❄',
   'snow piles up on the trees, the roof and the snowman — tap them to shake it off ❄',
   'snow settles on your letter too — tap its top edge to brush it off',
-  'catch a shooting star 🌠 … Santa might fly by with a present for Mochi'
+  'catch a shooting star 🌠 … Santa might fly by with a present for {buddy}'
 ];
 function hint(i = 0) {
   const h = $('#hint'); clearTimeout(hint.t);
   if (i >= HINTS.length) { h.classList.remove('show'); return; }
-  hint.i = i; h.innerHTML = HINTS[i]; h.classList.add('show');
+  hint.i = i; h.innerHTML = HINTS[i].replaceAll('{buddy}', BUDDIES.cur.name); h.classList.add('show');
   hint.t = setTimeout(() => { h.classList.remove('show'); hint.t = setTimeout(() => hint(i + 1), 1300); }, 6500);
 }
 
@@ -1756,6 +1848,17 @@ function setupComposer() {
   const text = () => input.value.trim() || DEFAULT_MSG;
   const isLocal = location.protocol === 'file:';
   if (isLocal) $('#note').innerHTML = 'Previewing from your computer. <b>Host this file first</b> (see README) so the link works for others.<br>Your message lives only inside the link — nothing is uploaded.';
+
+  const picker = $('#buddies');
+  for (const [k, b] of Object.entries(BUDDIES.LIST)) {
+    const btn = document.createElement('button');
+    btn.className = 'buddy'; btn.type = 'button'; btn.dataset.k = k; btn.setAttribute('role', 'radio'); btn.title = `${b.name} the ${b.kind.toLowerCase()}`;
+    btn.innerHTML = `<img src="${b.thumb}" alt="">${b.kind}<small>${b.name}</small>`;
+    btn.onclick = () => { Scene.setBuddy(k, true); localStorage.setItem('xmas-card-buddy', k); mark(); };
+    picker.appendChild(btn);
+  }
+  const mark = () => picker.querySelectorAll('.buddy').forEach(b => b.setAttribute('aria-checked', b.dataset.k === buddyKey));
+  mark();
 
   $('#btn-preview').onclick = () => {
     message = text(); $('#composer').classList.add('hidden'); $('#btn-edit').classList.remove('hidden'); showEnvelope();
@@ -1802,6 +1905,7 @@ window.toast = toast;
 Scene.start();
 
 const fromLink = hashMsg();
+Scene.setBuddy(hashBuddy() || (fromLink ? 'hamster' : localStorage.getItem('xmas-card-buddy')) || 'hamster');
 if (SHOT) {
   $('#controls').classList.add('hidden'); $('#btn-fold').classList.add('hidden');
   if (params.get('shot') === 'card') { showCard(fromLink || DEFAULT_MSG, true); }
